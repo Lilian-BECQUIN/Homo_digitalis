@@ -1,0 +1,16 @@
+[package]
+name = "homo-app"
+description = "Application desktop Homo Digitalis : rendu 3D (Bevy/wgpu) + HUD bac à sable"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "homo-digitalis"
+path = "src/main.rs"
+
+[dependencies]
+sim-core = { path = "../sim-core" }
+bevy = "0.15"
+bevy_egui = "0.32"

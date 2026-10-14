@@ -1,0 +1,10 @@
+[package]
+name = "sim-core"
+description = "Noyau physiologique déterministe de Homo Digitalis (sans dépendance, sans rendu)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Volontairement vide : le noyau est du Rust pur, déterministe et testable sans GPU.

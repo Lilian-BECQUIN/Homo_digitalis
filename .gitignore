@@ -1,0 +1,7 @@
+/target
+Cargo.lock.bak
+*.log
+.DS_Store
+# Assets bruts volumineux (sources Z-Anatomy / BodyParts3D, .blend) : voir docs/ASSET_PIPELINE.md
+/assets_src/
+*.blend1
