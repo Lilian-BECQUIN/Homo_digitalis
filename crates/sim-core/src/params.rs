@@ -37,6 +37,8 @@ pub struct HemodynamicParams {
     pub venoconstriction_ml: f64,
     pub muscle_pump_ml: f64,
     pub adrenaline_sympathomimetic: f64,
+    /// Effet chronotrope direct (β1) de l'adrénaline, en bpm à saturation (non compensé par le baroréflexe).
+    pub adrenaline_direct_hr_gain: f64,
     pub effort_symp_drive: f64,
     pub chemo_symp_drive: f64,
     pub chemo_para_drive: f64,
@@ -78,6 +80,7 @@ impl Default for HemodynamicParams {
             venoconstriction_ml: 400.0,
             muscle_pump_ml: 250.0,
             adrenaline_sympathomimetic: 0.5,
+            adrenaline_direct_hr_gain: 50.0,
             effort_symp_drive: 0.7,
             chemo_symp_drive: 0.6,
             chemo_para_drive: 0.3,

@@ -32,11 +32,13 @@ pub fn compute(altitude_m: f64) -> GasExchange {
     let pio2 = 0.2095 * (pb - 47.0);
     let mut paco2 = 40.0;
     let mut pao2 = (pio2 - paco2 / 0.8 - 2.0).max(1.0);
-    // Point fixe amorti : 20 itérations suffisent largement (convergence monotone).
-    for _ in 0..20 {
+    // Point fixe sous-relaxé : la pente de la fonction d'itération dépasse 1 en valeur absolue
+    // (≈ -1,9), l'itération brute oscillerait entre deux états. Relaxation 0,4 → contraction.
+    for _ in 0..60 {
         let drive = clamp01((100.0 - pao2) / 60.0);
         let ventilation = 1.0 + 2.3 * drive;
-        paco2 = 40.0 / ventilation;
+        let paco2_target = 40.0 / ventilation;
+        paco2 += 0.4 * (paco2_target - paco2);
         pao2 = (pio2 - paco2 / 0.8 - 2.0).max(1.0);
     }
     GasExchange {

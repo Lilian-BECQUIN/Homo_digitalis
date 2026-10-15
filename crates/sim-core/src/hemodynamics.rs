@@ -125,7 +125,8 @@ impl HemodynamicsModel {
 
         // Nœud sinusal : fréquence modulée par sympathique (+) / parasympathique (−).
         let mut hr = (p.hr_rest_bpm + p.hr_gain_symp * (s_eff - p.symp_rest)
-            - p.hr_gain_para * (y[PARA] - p.para_rest))
+            - p.hr_gain_para * (y[PARA] - p.para_rest)
+            + p.adrenaline_direct_hr_gain * adren / (adren + 1.0))
             .clamp(30.0, 220.0);
         if self.arrested {
             hr = 0.0;
