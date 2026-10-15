@@ -218,13 +218,9 @@ def classify_part_zone(name: str, system: str) -> str:
     if 'skin' in n and (system == 'integumentary' or 'integumentary' in system):
         return 'SKIN'
     if any(k in n for k in ARM_KEYWORDS):
-        if 'left' in n: return 'ARM_L'
-        if 'right' in n: return 'ARM_R'
-        return 'ARM_GENERIC'
+        return 'ARM'
     if any(k in n for k in LEG_KEYWORDS):
-        if 'left' in n: return 'LEG_L'
-        if 'right' in n: return 'LEG_R'
-        return 'LEG_GENERIC'
+        return 'LEG'
     return 'TRUNK'
 
 def compute_part_weights(pos: np.ndarray, name: str, system: str, layer: str):
@@ -236,14 +232,6 @@ def compute_part_weights(pos: np.ndarray, name: str, system: str, layer: str):
     d_sq = np.sum((pos[:, None, :] - Q)**2, axis=2)
     
     is_left_pt = (pos[:, 0] >= 0)[:, None]
-    is_arm_r = np.array([b[0] in ARM_R_BONES for b in BONES])
-    is_leg_r = np.array([b[0] in LEG_R_BONES for b in BONES])
-    is_arm_l = np.array([b[0] in ARM_L_BONES for b in BONES])
-    is_leg_l = np.array([b[0] in LEG_L_BONES for b in BONES])
-    
-    # Masquage latéral strict
-    d_sq[is_left_pt & (is_arm_r | is_leg_r)[None, :]] += 1e6
-    d_sq[(~is_left_pt) & (is_arm_l | is_leg_l)[None, :]] += 1e6
     
     # Organes, viscères et vertèbres toujours 100% sur le squelette axial (tronc)
     if layer in ('Heart', 'Viscera', 'Vertebrae'):
@@ -254,32 +242,20 @@ def compute_part_weights(pos: np.ndarray, name: str, system: str, layer: str):
     if zone == 'TRUNK':
         allowed = np.array([b[0] in (TRUNK_BONES | {'LeftClavicle', 'RightClavicle'}) for b in BONES])
         d_sq[:, ~allowed] += 1e6
-    elif zone == 'ARM_L':
-        allowed = np.array([b[0] in ARM_L_BONES for b in BONES])
-        d_sq[:, ~allowed] += 1e6
-    elif zone == 'ARM_R':
-        allowed = np.array([b[0] in ARM_R_BONES for b in BONES])
-        d_sq[:, ~allowed] += 1e6
-    elif zone == 'LEG_L':
-        allowed = np.array([b[0] in (LEG_L_BONES | {'Hips'}) for b in BONES])
-        d_sq[:, ~allowed] += 1e6
-    elif zone == 'LEG_R':
-        allowed = np.array([b[0] in (LEG_R_BONES | {'Hips'}) for b in BONES])
-        d_sq[:, ~allowed] += 1e6
-    elif zone == 'ARM_GENERIC':
+    elif zone == 'ARM':
         allowed_l = np.array([b[0] in ARM_L_BONES for b in BONES])
         allowed_r = np.array([b[0] in ARM_R_BONES for b in BONES])
         d_sq[is_left_pt & (~allowed_l)[None, :]] += 1e6
         d_sq[(~is_left_pt) & (~allowed_r)[None, :]] += 1e6
-    elif zone == 'LEG_GENERIC':
+    elif zone == 'LEG':
         allowed_l = np.array([b[0] in (LEG_L_BONES | {'Hips'}) for b in BONES])
         allowed_r = np.array([b[0] in (LEG_R_BONES | {'Hips'}) for b in BONES])
         d_sq[is_left_pt & (~allowed_l)[None, :]] += 1e6
         d_sq[(~is_left_pt) & (~allowed_r)[None, :]] += 1e6
     elif zone == 'SKIN':
         x, y = pos[:, 0], pos[:, 1]
-        is_sk_arm_l = (x > 0) & (((y < 1.33) & (x > 0.165)) | ((y >= 1.33) & (y <= 1.55) & (x > 0.155)))
-        is_sk_arm_r = (x < 0) & (((y < 1.33) & (x < -0.165)) | ((y >= 1.33) & (y <= 1.55) & (x < -0.155)))
+        is_sk_arm_l = (x > 0) & (y >= 0.70) & (((y < 1.33) & (x > 0.165)) | ((y >= 1.33) & (y <= 1.55) & (x > 0.155)))
+        is_sk_arm_r = (x < 0) & (y >= 0.70) & (((y < 1.33) & (x < -0.165)) | ((y >= 1.33) & (y <= 1.55) & (x < -0.155)))
         is_sk_leg_l = (x >= 0) & (y < 0.85) & (~is_sk_arm_l)
         is_sk_leg_r = (x < 0) & (y < 0.85) & (~is_sk_arm_r)
         is_sk_torso = (~is_sk_arm_l) & (~is_sk_arm_r) & (~is_sk_leg_l) & (~is_sk_leg_r)
@@ -310,7 +286,7 @@ def compute_part_weights(pos: np.ndarray, name: str, system: str, layer: str):
     top4_idx = np.argsort(-raw_weights, axis=1)[:, :4]
     top4_weights = np.take_along_axis(raw_weights, top4_idx, axis=1)
     sum_w = np.sum(top4_weights, axis=1, keepdims=True)
-    top4_weights /= (sum_w + 1e-8)
+    top4_weights /= np.maximum(sum_w, 1e-6)
     return top4_idx.astype(np.uint16), top4_weights.astype(np.float32)
 
 def build_skinned_glb(atlas_file: Path, bin_prefix: str, classify_layer_fn, output_file: Path) -> None:
