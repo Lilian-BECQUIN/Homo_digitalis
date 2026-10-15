@@ -335,151 +335,174 @@ fn animate_biomechanics(
             let cycle = 2.4_f32;
             let phase_t = jt % cycle;
 
-            if phase_t < 0.50 {
-                // Phase 1 : Armement / Flexion préliminaire (fléchissement hanches/genoux, bras en arrière)
-                let p = phase_t / 0.50;
-                let s = (p * FRAC_PI_2).sin();
+            if phase_t < 0.55 {
+                // Phase 1 : Armement / Flexion préliminaire (0.00 à 0.55 s)
+                // Fléchissement coordonné hanches/genoux, bras balancés souplement vers l'arrière
+                let tau = phase_t / 0.55;
+                let s = (1.0 - (tau * PI).cos()) * 0.5; // Smoothstep 0 -> 1
 
                 hips_offset.y = -s * 0.22;
-                hips_rot = Quat::from_rotation_x(-s * 0.16);
-                spine_rot = Quat::from_rotation_x(-s * 0.14);
-                thorax_rot = Quat::from_rotation_x(-s * 0.12);
+                hips_rot = Quat::from_rotation_x(-s * 0.15);
+                spine_rot = Quat::from_rotation_x(-s * 0.12);
+                thorax_rot = Quat::from_rotation_x(-s * 0.10);
 
-                l_thigh_rot = Quat::from_rotation_x(-s * 0.65); // hanches fléchies en avant
+                l_thigh_rot = Quat::from_rotation_x(-s * 0.65);
                 r_thigh_rot = Quat::from_rotation_x(-s * 0.65);
 
-                l_calf_rot = Quat::from_rotation_x(s * 1.15);   // genoux fléchis vers l'arrière
+                l_calf_rot = Quat::from_rotation_x(s * 1.15);
                 r_calf_rot = Quat::from_rotation_x(s * 1.15);
 
-                l_foot_rot = Quat::from_rotation_x(-s * 0.28);  // dorsiflexion
-                r_foot_rot = Quat::from_rotation_x(-s * 0.28);
+                l_foot_rot = Quat::from_rotation_x(-s * 0.25);
+                r_foot_rot = Quat::from_rotation_x(-s * 0.25);
 
-                l_toes_rot = Quat::from_rotation_x(-s * 0.12);
-                r_toes_rot = Quat::from_rotation_x(-s * 0.12);
+                l_toes_rot = Quat::from_rotation_x(-s * 0.10);
+                r_toes_rot = Quat::from_rotation_x(-s * 0.10);
 
-                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, s * 0.08, 0.0, -0.02);
-                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, s * 0.08, 0.0, 0.02);
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, s * 0.06, 0.0, -0.02);
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, s * 0.06, 0.0, 0.02);
 
                 // Bras armés en arrière (+X)
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, s * 0.55, 0.0, 0.08);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, s * 0.55, 0.0, -0.08);
-                l_forearm_rot = Quat::from_rotation_x(-0.35);
-                r_forearm_rot = Quat::from_rotation_x(-0.35);
+                let arm_angle = s * 0.45;
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.08);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.08);
+                l_forearm_rot = Quat::from_rotation_x(-0.30);
+                r_forearm_rot = Quat::from_rotation_x(-0.30);
 
-                current_g = 1.0 - s * 0.4;
+                current_g = 1.0 - s * 0.35;
                 vert_compression = 0.01;
-            } else if phase_t < 0.80 {
-                // Phase 2 : Impulsion explosive / Triple Extension (détente jambes, bras projetés vers le haut)
-                let p = (phase_t - 0.50) / 0.30;
-                let s = 1.0 - p;
+            } else if phase_t < 0.85 {
+                // Phase 2 : Impulsion explosive / Triple Extension (0.55 à 0.85 s)
+                // Détente violente des jambes, propulsion plantaire, bras projetés vers le ciel
+                let tau = (phase_t - 0.55) / 0.30;
+                let p = (1.0 - (tau * PI).cos()) * 0.5; // Smoothstep 0 -> 1
 
-                hips_offset.y = -s * 0.22 + p * 0.08;
-                hips_rot = Quat::from_rotation_x(-s * 0.16 + p * 0.05);
-                spine_rot = Quat::from_rotation_x(-s * 0.14 + p * 0.05);
-                thorax_rot = Quat::from_rotation_x(-s * 0.12 + p * 0.05);
+                hips_offset.y = -0.22 * (1.0 - p) + 0.06 * p;
+                hips_rot = Quat::from_rotation_x(-0.15 * (1.0 - p));
+                spine_rot = Quat::from_rotation_x(-0.12 * (1.0 - p));
+                thorax_rot = Quat::from_rotation_x(-0.10 * (1.0 - p));
 
-                l_thigh_rot = Quat::from_rotation_x(-s * 0.65); // extension complète vers 0°
-                r_thigh_rot = Quat::from_rotation_x(-s * 0.65);
+                l_thigh_rot = Quat::from_rotation_x(-0.65 * (1.0 - p));
+                r_thigh_rot = Quat::from_rotation_x(-0.65 * (1.0 - p));
 
-                l_calf_rot = Quat::from_rotation_x(s * 1.15);   // genoux tendus
-                r_calf_rot = Quat::from_rotation_x(s * 1.15);
+                l_calf_rot = Quat::from_rotation_x(1.15 * (1.0 - p));
+                r_calf_rot = Quat::from_rotation_x(1.15 * (1.0 - p));
 
-                l_foot_rot = Quat::from_rotation_x(p * 0.55);   // poussée explosive sur la pointe
-                r_foot_rot = Quat::from_rotation_x(p * 0.55);
+                l_foot_rot = Quat::from_rotation_x(-0.25 * (1.0 - p) + 0.45 * p);
+                r_foot_rot = Quat::from_rotation_x(-0.25 * (1.0 - p) + 0.45 * p);
 
-                l_toes_rot = Quat::from_rotation_x(p * 0.68);   // propulsion puissante des orteils
-                r_toes_rot = Quat::from_rotation_x(p * 0.68);
+                l_toes_rot = Quat::from_rotation_x(-0.10 * (1.0 - p) + 0.60 * p);
+                r_toes_rot = Quat::from_rotation_x(-0.10 * (1.0 - p) + 0.60 * p);
 
-                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -p * 0.20, 0.0, 0.06);
-                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -p * 0.20, 0.0, -0.06);
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, 0.06 * (1.0 - p) - 0.15 * p, 0.0, 0.06 * p);
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, 0.06 * (1.0 - p) - 0.15 * p, 0.0, -0.06 * p);
 
                 // Bras projetés vigoureusement vers le haut (-X)
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -p * 1.65, 0.0, 0.12);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -p * 1.65, 0.0, -0.12);
-                l_forearm_rot = Quat::from_rotation_x(-0.45);
-                r_forearm_rot = Quat::from_rotation_x(-0.45);
+                let arm_angle = 0.45 * (1.0 - p) - 1.45 * p;
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.10);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.10);
+                l_forearm_rot = Quat::from_rotation_x(-0.30 * (1.0 - p) - 0.25 * p);
+                r_forearm_rot = Quat::from_rotation_x(-0.30 * (1.0 - p) - 0.25 * p);
 
-                let impulse = (p * PI).sin();
+                let impulse = (tau * PI).sin();
                 current_g = 1.0 + impulse * 1.85; // pic de décollage à 2,85 G
                 vert_compression = 0.04 * impulse;
             } else if phase_t < 1.50 {
-                // Phase 3 : Vol balistique libre / Apex en apesanteur (+40 cm)
-                let p = (phase_t - 0.80) / 0.70;
-                let arc = (p * PI).sin();
+                // Phase 3 : Vol balistique libre / Apex en apesanteur (0.85 à 1.50 s)
+                // Trajectoire parabolique fluide (sommet à +44 cm), corps suspendu
+                let tau = (phase_t - 0.85) / 0.65;
+                let arc = 4.0 * tau * (1.0 - tau); // Parabole parfaite 0 -> 1 -> 0
 
-                hips_offset.y = 0.08 + arc * 0.40; // corps suspendu en l'air à +48 cm
+                hips_offset.y = 0.06 + arc * 0.38; // Corps à +44 cm au sommet
                 hips_rot = Quat::IDENTITY;
                 spine_rot = Quat::IDENTITY;
                 thorax_rot = Quat::IDENTITY;
 
-                l_thigh_rot = Quat::from_rotation_x(-arc * 0.25); // jambes légèrement repliées
-                r_thigh_rot = Quat::from_rotation_x(-arc * 0.25);
+                let tuck = (tau * PI).sin() * 0.18;
+                l_thigh_rot = Quat::from_rotation_x(-tuck);
+                r_thigh_rot = Quat::from_rotation_x(-tuck);
 
-                l_calf_rot = Quat::from_rotation_x(arc * 0.40);   // genoux légèrement fléchis
-                r_calf_rot = Quat::from_rotation_x(arc * 0.40);
+                l_calf_rot = Quat::from_rotation_x(tuck * 1.4);
+                r_calf_rot = Quat::from_rotation_x(tuck * 1.4);
 
-                l_foot_rot = Quat::from_rotation_x(0.12);
-                r_foot_rot = Quat::from_rotation_x(0.12);
+                l_foot_rot = Quat::from_rotation_x(0.45 * (1.0 - tau) + 0.10 * tau);
+                r_foot_rot = Quat::from_rotation_x(0.45 * (1.0 - tau) + 0.10 * tau);
 
-                l_toes_rot = Quat::from_rotation_x(0.16);
-                r_toes_rot = Quat::from_rotation_x(0.16);
+                l_toes_rot = Quat::from_rotation_x(0.60 * (1.0 - tau) + 0.12 * tau);
+                r_toes_rot = Quat::from_rotation_x(0.60 * (1.0 - tau) + 0.12 * tau);
 
-                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.12 * (1.0 - p), 0.0, 0.04 * (1.0 - p));
-                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.12 * (1.0 - p), 0.0, -0.04 * (1.0 - p));
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.15 * (1.0 - tau) - 0.04 * tau, 0.0, 0.04 * (1.0 - tau));
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.15 * (1.0 - tau) - 0.04 * tau, 0.0, -0.04 * (1.0 - tau));
 
-                // Bras flottant au sommet puis redescendant
-                let arm_float = -(1.65 * (1.0 - p) + 0.40 * p);
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_float, 0.0, 0.10);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_float, 0.0, -0.10);
-                l_forearm_rot = Quat::from_rotation_x(-0.35);
-                r_forearm_rot = Quat::from_rotation_x(-0.35);
+                // Bras flottant au sommet puis redescendant doucement vers le bas
+                let arm_angle = -1.45 * (1.0 - tau) - 0.45 * tau;
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.10);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.10);
+                l_forearm_rot = Quat::from_rotation_x(-0.25 * (1.0 - tau) - 0.35 * tau);
+                r_forearm_rot = Quat::from_rotation_x(-0.25 * (1.0 - tau) - 0.35 * tau);
 
                 current_g = 0.05; // apesanteur en vol libre
                 vert_compression = 0.0;
-            } else if phase_t < 1.90 {
-                // Phase 4 : Réception & Amorti d'impact (flexion amortissante genoux/hanches)
-                let p = (phase_t - 1.50) / 0.40;
-                let decel = (p * PI).sin() * (1.0 - 0.25 * p);
+            } else if phase_t < 1.95 {
+                // Phase 4 : Réception & Amorti d'impact (1.50 à 1.95 s)
+                // Flexion amortissante genoux/hanches pour absorber l'impact au sol
+                let tau = (phase_t - 1.50) / 0.45;
+                let c = (tau * PI).sin();
 
-                hips_offset.y = -decel * 0.20;
-                hips_rot = Quat::from_rotation_x(-decel * 0.15);
-                spine_rot = Quat::from_rotation_x(-decel * 0.16);
-                thorax_rot = Quat::from_rotation_x(-decel * 0.18);
+                hips_offset.y = 0.06 * (1.0 - tau) - c * 0.20;
+                hips_rot = Quat::from_rotation_x(-c * 0.15);
+                spine_rot = Quat::from_rotation_x(-c * 0.14);
+                thorax_rot = Quat::from_rotation_x(-c * 0.12);
 
-                l_thigh_rot = Quat::from_rotation_x(-decel * 0.55);
-                r_thigh_rot = Quat::from_rotation_x(-decel * 0.55);
+                l_thigh_rot = Quat::from_rotation_x(-c * 0.55);
+                r_thigh_rot = Quat::from_rotation_x(-c * 0.55);
 
-                l_calf_rot = Quat::from_rotation_x(decel * 1.10);   // flexion amortissante genoux
-                r_calf_rot = Quat::from_rotation_x(decel * 1.10);
+                l_calf_rot = Quat::from_rotation_x(c * 1.05);
+                r_calf_rot = Quat::from_rotation_x(c * 1.05);
 
-                l_foot_rot = Quat::from_rotation_x(-decel * 0.22);
-                r_foot_rot = Quat::from_rotation_x(-decel * 0.22);
+                l_foot_rot = Quat::from_rotation_x(-c * 0.22);
+                r_foot_rot = Quat::from_rotation_x(-c * 0.22);
 
-                l_toes_rot = Quat::from_rotation_x(-decel * 0.12);
-                r_toes_rot = Quat::from_rotation_x(-decel * 0.12);
+                l_toes_rot = Quat::from_rotation_x(-c * 0.10);
+                r_toes_rot = Quat::from_rotation_x(-c * 0.10);
 
-                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -decel * 0.08, 0.0, 0.02);
-                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -decel * 0.08, 0.0, -0.02);
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.04 * (1.0 - tau), 0.0, 0.0);
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.04 * (1.0 - tau), 0.0, 0.0);
 
                 // Bras fléchis en avant pour stabiliser le contrepoids
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -decel * 0.50, 0.0, 0.08);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -decel * 0.50, 0.0, -0.08);
-                l_forearm_rot = Quat::from_rotation_x(-0.45);
-                r_forearm_rot = Quat::from_rotation_x(-0.45);
+                let arm_angle = -0.45 * (1.0 - tau) - 0.15 * tau;
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.08);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.08);
+                l_forearm_rot = Quat::from_rotation_x(-0.35 * (1.0 - tau) - 0.20 * tau);
+                r_forearm_rot = Quat::from_rotation_x(-0.35 * (1.0 - tau) - 0.20 * tau);
 
-                let impact_pulse = (p * FRAC_PI_2).sin() * (1.0 - p);
+                let impact_pulse = (tau * FRAC_PI_2).sin() * (1.0 - tau);
                 current_g = 1.0 + impact_pulse * 1.65; // pic d'impact 2,65 G
                 vert_compression = impact_pulse * 0.055;
             } else {
-                // Phase 5 : Rétablissement postural élastique
-                let p = (phase_t - 1.90) / 0.50;
-                let s = 1.0 - p;
+                // Phase 5 : Rétablissement postural élastique (1.95 à 2.40 s)
+                // Retour fluide et continu à la position debout naturelle
+                let tau = (phase_t - 1.95) / 0.45;
+                let s = (1.0 + (tau * PI).cos()) * 0.5; // Smoothstep 1 -> 0
 
-                hips_offset.y = -s * 0.05;
-                l_calf_rot = Quat::from_rotation_x(s * 0.15);
-                r_calf_rot = Quat::from_rotation_x(s * 0.15);
-                l_forearm_rot = Quat::from_rotation_x(-0.10);
-                r_forearm_rot = Quat::from_rotation_x(-0.10);
+                hips_offset.y = -0.04 * s;
+                hips_rot = Quat::from_rotation_x(-0.03 * s);
+                spine_rot = Quat::from_rotation_x(-0.02 * s);
+                thorax_rot = Quat::from_rotation_x(-0.02 * s);
+
+                l_thigh_rot = Quat::from_rotation_x(-0.08 * s);
+                r_thigh_rot = Quat::from_rotation_x(-0.08 * s);
+
+                l_calf_rot = Quat::from_rotation_x(0.15 * s);
+                r_calf_rot = Quat::from_rotation_x(0.15 * s);
+
+                let arm_angle = -0.15 * s;
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.06);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.06);
+
+                let elbow_angle = -0.20 * s - 0.10 * (1.0 - s);
+                l_forearm_rot = Quat::from_rotation_x(elbow_angle);
+                r_forearm_rot = Quat::from_rotation_x(elbow_angle);
+
                 current_g = 1.0;
                 vert_compression = 0.0;
             }

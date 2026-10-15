@@ -162,8 +162,36 @@ is_arm_r = np.array([b[0] in ARM_R_BONES for b in BONES])
 is_leg_l = np.array([b[0] in LEG_L_BONES for b in BONES])
 is_leg_r = np.array([b[0] in LEG_R_BONES for b in BONES])
 
+NEIGHBORS = {
+    'Hips': {'Hips', 'Spine', 'LeftThigh', 'RightThigh'},
+    'Spine': {'Hips', 'Spine', 'Thorax'},
+    'Thorax': {'Spine', 'Thorax', 'Neck', 'LeftClavicle', 'RightClavicle'},
+    'Neck': {'Thorax', 'Neck', 'Head'},
+    'Head': {'Neck', 'Head'},
+    
+    'LeftClavicle': {'Thorax', 'LeftClavicle', 'LeftUpperArm'},
+    'LeftUpperArm': {'LeftClavicle', 'LeftUpperArm', 'LeftForearm'},
+    'LeftForearm': {'LeftUpperArm', 'LeftForearm', 'LeftHand'},
+    'LeftHand': {'LeftForearm', 'LeftHand'},
+    
+    'RightClavicle': {'Thorax', 'RightClavicle', 'RightUpperArm'},
+    'RightUpperArm': {'RightClavicle', 'RightUpperArm', 'RightForearm'},
+    'RightForearm': {'RightUpperArm', 'RightForearm', 'RightHand'},
+    'RightHand': {'RightForearm', 'RightHand'},
+    
+    'LeftThigh': {'Hips', 'LeftThigh', 'LeftCalf'},
+    'LeftCalf': {'LeftThigh', 'LeftCalf', 'LeftFoot'},
+    'LeftFoot': {'LeftCalf', 'LeftFoot', 'LeftToes'},
+    'LeftToes': {'LeftFoot', 'LeftToes'},
+    
+    'RightThigh': {'Hips', 'RightThigh', 'RightCalf'},
+    'RightCalf': {'RightThigh', 'RightCalf', 'RightFoot'},
+    'RightFoot': {'RightCalf', 'RightFoot', 'RightToes'},
+    'RightToes': {'RightFoot', 'RightToes'},
+}
+
 def compute_weights_layer(pos: np.ndarray, layer: str):
-    """Calcule les 4 os d'influence et leurs poids de skinning avec partitionnement anatomique strict."""
+    """Calcule les 4 os d'influence et leurs poids de skinning avec partitionnement cinématique et anatomique strict."""
     AP = pos[:, None, :] - bone_A[None, :, :]
     dot = np.sum(AP * bone_AB[None, :, :], axis=2)
     t = np.clip(dot / bone_len_sq[None, :], 0.0, 1.0)
@@ -173,24 +201,27 @@ def compute_weights_layer(pos: np.ndarray, layer: str):
     # 1. Les organes internes et vertèbres sont 100% rattachés au squelette axial (tronc)
     if layer in ('Heart', 'Viscera', 'Vertebrae'):
         d_sq[:, ~is_trunk] += 1e6
-    else:
-        # Masquage latéral strict : le côté gauche n'est jamais influencé par les membres droits, et vice-versa
-        is_left_pt = (pos[:, 0] >= 0)[:, None]
-        d_sq[is_left_pt & (is_arm_r | is_leg_r)[None, :]] += 1e6
-        d_sq[(~is_left_pt) & (is_arm_l | is_leg_l)[None, :]] += 1e6
         
-        # Les jambes n'influencent jamais au-dessus du bassin (Y > 0.92)
-        d_sq[(pos[:, 1] > 0.92)[:, None] & (is_leg_l | is_leg_r)[None, :]] += 1e6
-        # Les bras n'influencent jamais sous le thorax (Y < 0.88)
-        d_sq[(pos[:, 1] < 0.88)[:, None] & (is_arm_l | is_arm_r)[None, :]] += 1e6
-        # Le tronc n'entraîne pas les membres inférieurs sous Y < 0.85
-        d_sq[(pos[:, 1] < 0.85)[:, None] & is_trunk[None, :]] += 1e6
-        # Le thorax médial (|X| < 0.145) n'est jamais tiré par les bras
-        in_chest = (np.abs(pos[:, 0]) < 0.145) & (pos[:, 1] > 0.95) & (pos[:, 1] < 1.48)
-        d_sq[in_chest[:, None] & (is_arm_l | is_arm_r)[None, :]] += 1e6
-        # Les extrémités des bras (avant-bras / mains) ne sont pas tirées par le tronc
-        in_arm = (np.abs(pos[:, 0]) > 0.20) & (pos[:, 1] < 1.15)
-        d_sq[in_arm[:, None] & is_trunk[None, :]] += 1e6
+    # Masquage latéral strict : gauche vs droite (aucun membre gauche influencé par la droite, et réciproquement)
+    is_left_pt = (pos[:, 0] >= 0)[:, None]
+    d_sq[is_left_pt & (is_arm_r | is_leg_r)[None, :]] += 1e6
+    d_sq[(~is_left_pt) & (is_arm_l | is_leg_l)[None, :]] += 1e6
+    
+    # 2. Identification de l'os primaire le plus proche
+    primary_bone_idx = np.argmin(d_sq, axis=1)
+    
+    # 3. Masquage cinématique strict : seuls l'os primaire et ses voisins directs
+    # dans la chaîne squelettique (parent/enfants) sont autorisés à influencer le vertex.
+    # Ceci élimine radicalement tout artefact d'étirement (ex: avant-bras attaché aux hanches).
+    mask = np.zeros_like(d_sq, dtype=bool)
+    for b_idx, (bname, _, _, _) in enumerate(BONES):
+        allowed_names = NEIGHBORS[bname]
+        allowed_indices = [BONE_NAME_TO_IDX[n] for n in allowed_names]
+        v_in_b = (primary_bone_idx == b_idx)
+        for ai in allowed_indices:
+            mask[v_in_b, ai] = True
+            
+    d_sq[~mask] += 1e6
     
     raw_weights = 1.0 / (d_sq + 0.0025)**2
     top4_idx = np.argsort(-raw_weights, axis=1)[:, :4]
