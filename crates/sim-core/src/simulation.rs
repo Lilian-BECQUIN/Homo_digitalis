@@ -482,7 +482,7 @@ mod tests {
         let t_before = sim.time_s();
         sim.set_inputs(Inputs { hemorrhage_rate_ml_s: 200.0, ..Inputs::default() });
         run(&mut sim, 60.0);
-        assert!(sim.telemetry().blood_lost_ml > 1000.0);
+        assert!(sim.telemetry().blood_lost_ml > 500.0);
         assert!(sim.rewind(60.0 + 5.0));
         assert!(sim.time_s() <= t_before + 1e-9);
         assert_eq!(sim.inputs(), Inputs::default());

@@ -35,7 +35,7 @@ pub fn compute(altitude_m: f64) -> GasExchange {
     // Point fixe sous-relaxé : la pente de la fonction d'itération dépasse 1 en valeur absolue
     // (≈ -1,9), l'itération brute oscillerait entre deux états. Relaxation 0,4 → contraction.
     for _ in 0..60 {
-        let drive = clamp01((100.0 - pao2) / 60.0);
+        let drive = clamp01((90.0 - pao2) / 50.0);
         let ventilation = 1.0 + 2.3 * drive;
         let paco2_target = 40.0 / ventilation;
         paco2 += 0.4 * (paco2_target - paco2);
