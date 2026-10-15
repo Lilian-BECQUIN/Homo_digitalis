@@ -8,6 +8,8 @@ Cargo.lock.bak
 crates/homo-app/assets/models/*.glb
 # Dossier de build Web
 crates/homo-app/dist/
+dist/
+__pycache__/
 # Assets bruts volumineux (sources Z-Anatomy / BodyParts3D, .blend)
 /assets_src/
 *.blend1
