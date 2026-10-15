@@ -164,24 +164,25 @@ def compute_weights_layer(pos: np.ndarray, layer: str):
     
     # 1. Les organes internes et vertèbres sont 100% rattachés au squelette axial (tronc)
     if layer in ('Heart', 'Viscera', 'Vertebrae'):
-        d_sq[:, ~is_trunk] += 1000.0
+        d_sq[:, ~is_trunk] += 1e6
     else:
-        # Pénalité de croisement corporel (le membre gauche n'influence jamais le membre droit)
-        pt_is_left = (pos[:, 0] > 0.01)[:, None]
-        pt_is_right = (pos[:, 0] < -0.01)[:, None]
-        d_sq += ((pt_is_right & (is_arm_l | is_leg_l)[None, :]) | (pt_is_left & (is_arm_r | is_leg_r)[None, :])) * 20.0
+        # Masquage latéral strict : le côté gauche n'est jamais influencé par les membres droits, et vice-versa
+        is_left_pt = (pos[:, 0] >= 0)[:, None]
+        d_sq[is_left_pt & (is_arm_r | is_leg_r)[None, :]] += 1e6
+        d_sq[(~is_left_pt) & (is_arm_l | is_leg_l)[None, :]] += 1e6
         
-        # Pénalité pour les bras : les sommets médiaux du thorax (|X| < 0.145) ne doivent pas être tirés par les bras
+        # Les jambes n'influencent jamais au-dessus du bassin (Y > 0.92)
+        d_sq[(pos[:, 1] > 0.92)[:, None] & (is_leg_l | is_leg_r)[None, :]] += 1e6
+        # Les bras n'influencent jamais sous le thorax (Y < 0.88)
+        d_sq[(pos[:, 1] < 0.88)[:, None] & (is_arm_l | is_arm_r)[None, :]] += 1e6
+        # Le tronc n'entraîne pas les membres inférieurs sous Y < 0.85
+        d_sq[(pos[:, 1] < 0.85)[:, None] & is_trunk[None, :]] += 1e6
+        # Le thorax médial (|X| < 0.145) n'est jamais tiré par les bras
         in_chest = (np.abs(pos[:, 0]) < 0.145) & (pos[:, 1] > 0.95) & (pos[:, 1] < 1.48)
-        d_sq[in_chest[:, None] & (is_arm_l | is_arm_r)[None, :]] += 6.0
-        
-        # Pénalité pour les jambes : les jambes n'influencent pas le haut du corps (Y > 0.95)
-        in_upper = (pos[:, 1] > 0.95)
-        d_sq[in_upper[:, None] & (is_leg_l | is_leg_r)[None, :]] += 20.0
-        
-        # Pénalité pour le tronc : le thorax ne tire pas les avant-bras/mains distaux
-        in_extremity = (np.abs(pos[:, 0]) > 0.22) | (pos[:, 1] < 0.05)
-        d_sq[in_extremity[:, None] & is_trunk[None, :]] += 10.0
+        d_sq[in_chest[:, None] & (is_arm_l | is_arm_r)[None, :]] += 1e6
+        # Les extrémités des bras (avant-bras / mains) ne sont pas tirées par le tronc
+        in_arm = (np.abs(pos[:, 0]) > 0.20) & (pos[:, 1] < 1.15)
+        d_sq[in_arm[:, None] & is_trunk[None, :]] += 1e6
     
     raw_weights = 1.0 / (d_sq + 0.0025)**2
     top4_idx = np.argsort(-raw_weights, axis=1)[:, :4]
