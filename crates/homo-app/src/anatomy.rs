@@ -36,6 +36,15 @@ pub struct Oxygenated;
 pub struct Pulsatile;
 
 #[derive(Component)]
+pub struct VertebraeMarker;
+
+#[derive(Component)]
+pub struct VisceraMarker;
+
+#[derive(Component)]
+pub struct MusclesMarker;
+
+#[derive(Component)]
 pub struct BaseScale(pub Vec3);
 
 #[derive(Resource, Default)]
@@ -98,6 +107,7 @@ fn setup_loaded_nodes(
                         tag: OrganTag::None,
                     },
                     BaseScale(Vec3::ONE),
+                    VertebraeMarker,
                     PickingBehavior::default(),
                 )).observe(on_click);
             }
@@ -122,6 +132,7 @@ fn setup_loaded_nodes(
                         tag: OrganTag::None,
                     },
                     BaseScale(Vec3::ONE),
+                    MusclesMarker,
                     PickingBehavior::default(),
                 )).observe(on_click);
             }
@@ -186,6 +197,7 @@ fn setup_loaded_nodes(
                         tag: OrganTag::None,
                     },
                     BaseScale(Vec3::ONE),
+                    VisceraMarker,
                     PickingBehavior::default(),
                 )).observe(on_click);
             }

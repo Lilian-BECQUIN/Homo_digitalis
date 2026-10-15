@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use sim_core::{gas, Inputs, Status};
 
+use crate::activity::{ActivityState, ActivityType};
 use crate::anatomy::{OrganTag, Selection};
 use crate::layers::{AnatomyLayer, Gender, LayerSettings};
 use crate::runner::{Command, LiveTelemetry, SimHandle};
@@ -92,6 +93,7 @@ fn hud(
     mut state: ResMut<UiState>,
     mut layers: ResMut<LayerSettings>,
     mut gender: ResMut<Gender>,
+    mut activity: ResMut<ActivityState>,
     live: Res<LiveTelemetry>,
     selection: Res<Selection>,
     handle: Res<SimHandle>,
@@ -158,8 +160,21 @@ fn hud(
         });
     });
 
-    // ------------------------------------------------------------ Gauche : sujet + isolation + calques
-    egui::SidePanel::left("environment").default_width(310.0).show(&ctx, |ui| {
+    // ------------------------------------------------------------ Gauche : activités + sujet + isolation + calques
+    egui::SidePanel::left("environment").default_width(320.0).show(&ctx, |ui| {
+        ui.heading("Activités & Biomécanique");
+        ui.horizontal_wrapped(|ui| {
+            for act in ActivityType::ALL {
+                let is_cur = activity.current == act;
+                if ui.selectable_label(is_cur, act.label()).clicked() {
+                    activity.set_activity(act);
+                    s.inputs.effort = activity.target_effort;
+                }
+            }
+        });
+        ui.small(activity.current.description());
+        ui.separator();
+
         ui.heading("Sujet Anatomique");
         ui.horizontal(|ui| {
             ui.selectable_value(&mut *gender, Gender::Male, "👨 Homme (Adulte)");
@@ -227,7 +242,12 @@ fn hud(
         ui.add(egui::Slider::new(&mut s.inputs.altitude_m, 0.0..=Inputs::MAX_ALTITUDE_M).text("Altitude").suffix(" m"));
         let g = gas::compute(s.inputs.altitude_m);
         ui.small(format!("PiO₂ = {:.0} mmHg · Patm = {:.0} mmHg", g.inspired_o2_mmhg, g.barometric_mmhg));
-        ui.add(egui::Slider::new(&mut s.inputs.effort, 0.0..=1.0).text("Effort physique"));
+        let effort_slider = ui.add(egui::Slider::new(&mut s.inputs.effort, 0.0..=1.0).text("Effort physique"));
+        if effort_slider.changed() {
+            activity.target_effort = s.inputs.effort;
+        } else {
+            s.inputs.effort = activity.current_effort;
+        }
         ui.add_space(6.0);
         ui.small("Souris : Clic gauche = sélection · Clic droit = orbite · Clic milieu = pan · Molette = zoom");
     });
@@ -297,8 +317,22 @@ fn hud(
             kv(ui, "PaO₂ / PaCO₂", format!("{:.0} / {:.0} mmHg", t.pao2_mmhg, t.paco2_mmhg));
             kv(ui, "Sympathique", format!("{:.2}", t.sympathetic));
             kv(ui, "Parasympathique", format!("{:.2}", t.parasympathetic));
-            kv(ui, "Adrénaline", format!("{:.2}", t.adrenaline));
             kv(ui, "Volume sanguin", format!("{:.0} mL (−{:.0})", t.blood_volume_ml, t.blood_lost_ml));
+        });
+
+        ui.separator();
+        ui.heading("Activité, Biomécanique & Métabolisme");
+        egui::Grid::new("activity_metrics").num_columns(2).striped(true).show(ui, |ui| {
+            kv(ui, "Mouvement actuel", activity.current.label().to_string());
+            kv(ui, "Vitesse de déplacement", format!("{:.1} km/h", activity.speed_kmh));
+            kv(ui, "Cadence locomotrice", format!("{:.0} pas/min", activity.cadence_spm));
+            kv(ui, "Force d'impact sol", format!("{:.2} G", activity.impact_g));
+            kv(ui, "Puissance mécanique", format!("{:.0} W", activity.power_watts));
+            kv(ui, "Dépense énergétique", format!("{:.0} kcal/h", activity.calories_kcal_h));
+            kv(ui, "Consommation VO₂", format!("{:.1} mL/kg/min", activity.vo2_ml_kg_min));
+            kv(ui, "Équivalent métabolique", format!("{:.1} METs", activity.mets));
+            kv(ui, "Fréquence respiratoire", format!("{:.0} /min", activity.breath_rate_rpm));
+            kv(ui, "Débit ventilatoire", format!("{:.1} L/min", activity.minute_ventilation_l_min));
         });
     });
 

@@ -1,6 +1,7 @@
 //! Homo Digitalis — point d'entrée. La simulation tourne dans son propre thread
 //! (voir `runner`) ; Bevy ne fait que lire la télémétrie et envoyer des commandes.
 
+mod activity;
 mod anatomy;
 mod camera;
 mod layers;
@@ -34,6 +35,7 @@ fn main() {
             layers::LayersPlugin,
             camera::OrbitCameraPlugin,
             anatomy::AnatomyPlugin,
+            activity::ActivityPlugin,
             visuals::VisualsPlugin,
             ui::UiPlugin,
         ))
