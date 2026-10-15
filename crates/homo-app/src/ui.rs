@@ -166,7 +166,8 @@ fn hud(
 
     // ------------------------------------------------------------ Gauche : activités + sujet + isolation + calques
     egui::SidePanel::left("environment").default_width(320.0).show(&ctx, |ui| {
-        ui.heading("Activités & Biomécanique");
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.heading("Activités & Biomécanique");
         ui.horizontal_wrapped(|ui| {
             for act in ActivityType::ALL {
                 let is_cur = activity.current == act;
@@ -254,11 +255,13 @@ fn hud(
         }
         ui.add_space(6.0);
         ui.small("Souris : Clic gauche = sélection · Clic droit = orbite · Clic milieu = pan · Molette = zoom");
+        });
     });
 
     // ------------------------------------------------------------ Droite : inspecteur
     egui::SidePanel::right("inspector").default_width(380.0).show(&ctx, |ui| {
-        ui.heading("Inspecteur télémétrique");
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.heading("Inspecteur télémétrique");
         match &selection.name {
             Some(name) => {
                 ui.strong(name);
@@ -407,6 +410,7 @@ fn hud(
             if count == 0 {
                 ui.small("Aucune structure correspondante.");
             }
+        });
         });
     });
 
