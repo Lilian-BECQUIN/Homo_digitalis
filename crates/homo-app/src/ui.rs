@@ -36,11 +36,11 @@ pub struct UiState {
 impl Default for UiState {
     fn default() -> Self {
         Self {
-            disclaimer_accepted: false,
+            disclaimer_accepted: true,
             inputs: Inputs::default(),
             last_sent: Inputs::default(),
             time_scale_idx: 1,
-            paused: true,
+            paused: false,
             adrenaline_dose: 1.0,
             ambient_temp_c: 20.0,
             humidity_pct: 50.0,
@@ -50,7 +50,7 @@ impl Default for UiState {
 }
 
 fn pause_until_disclaimer_accepted(handle: Res<SimHandle>) {
-    handle.send(Command::SetPaused(true));
+    handle.send(Command::SetPaused(false));
 }
 
 fn kv(ui: &mut egui::Ui, key: &str, value: String) {
