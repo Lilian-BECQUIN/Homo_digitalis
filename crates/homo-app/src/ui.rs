@@ -27,6 +27,8 @@ pub struct UiState {
     time_scale_idx: usize,
     paused: bool,
     adrenaline_dose: f64,
+    search_query: String,
+    system_filter: usize,
     // Paramètres d'environnement des phases ultérieures (affichés, non encore actifs).
     ambient_temp_c: f64,
     humidity_pct: f64,
@@ -42,6 +44,8 @@ impl Default for UiState {
             time_scale_idx: 1,
             paused: false,
             adrenaline_dose: 1.0,
+            search_query: String::new(),
+            system_filter: 0,
             ambient_temp_c: 20.0,
             humidity_pct: 50.0,
             gravity_g: 1.0,
@@ -95,7 +99,7 @@ fn hud(
     mut gender: ResMut<Gender>,
     mut activity: ResMut<ActivityState>,
     live: Res<LiveTelemetry>,
-    selection: Res<Selection>,
+    mut selection: ResMut<Selection>,
     handle: Res<SimHandle>,
 ) {
     let ctx = contexts.ctx_mut().clone();
@@ -253,7 +257,7 @@ fn hud(
     });
 
     // ------------------------------------------------------------ Droite : inspecteur
-    egui::SidePanel::right("inspector").default_width(340.0).show(&ctx, |ui| {
+    egui::SidePanel::right("inspector").default_width(380.0).show(&ctx, |ui| {
         ui.heading("Inspecteur télémétrique");
         match &selection.name {
             Some(name) => {
@@ -333,6 +337,76 @@ fn hud(
             kv(ui, "Équivalent métabolique", format!("{:.1} METs", activity.mets));
             kv(ui, "Fréquence respiratoire", format!("{:.0} /min", activity.breath_rate_rpm));
             kv(ui, "Débit ventilatoire", format!("{:.1} L/min", activity.minute_ventilation_l_min));
+        });
+
+        ui.separator();
+        ui.heading("Encyclopédie Anatomique (2 234 structures)");
+        ui.small("Base BodyParts3D / Human Reference Atlas :");
+        ui.small("• 296 os & ligaments • 402 muscles & tendons");
+        ui.small("• 1 043 vaisseaux & cœur • 184 nerfs • 286 viscères");
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.label("🔍");
+            ui.add(egui::TextEdit::singleline(&mut s.search_query).hint_text("Rechercher os, tendon, nerf, organe..."));
+            if !s.search_query.is_empty() && ui.button("✖").clicked() {
+                s.search_query.clear();
+            }
+        });
+
+        ui.horizontal_wrapped(|ui| {
+            ui.selectable_value(&mut s.system_filter, 0, "Tous (1 674)");
+            ui.selectable_value(&mut s.system_filter, 1, "🦴 Squelette & Rachis");
+            ui.selectable_value(&mut s.system_filter, 2, "💪 Muscles & Tendons");
+            ui.selectable_value(&mut s.system_filter, 3, "❤️ Cœur & Vaisseaux");
+            ui.selectable_value(&mut s.system_filter, 4, "⚡ Système Nerveux");
+            ui.selectable_value(&mut s.system_filter, 5, "🫁 Viscères & Organes");
+        });
+
+        let q = s.search_query.trim().to_lowercase();
+        let filter_idx = s.system_filter;
+
+        egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+            let mut count = 0;
+            for entry in crate::anatomy_catalog::ANATOMY_CATALOG {
+                let match_filter = match filter_idx {
+                    0 => true,
+                    1 => entry.layer_idx == 1 || entry.layer_idx == 2,
+                    2 => entry.layer_idx == 3,
+                    3 => entry.layer_idx == 4 || entry.layer_idx == 5 || entry.layer_idx == 6,
+                    4 => entry.layer_idx == 7,
+                    5 => entry.layer_idx == 8,
+                    _ => true,
+                };
+                if !match_filter {
+                    continue;
+                }
+
+                if !q.is_empty() && !entry.name.to_lowercase().contains(&q) && !entry.category.to_lowercase().contains(&q) {
+                    continue;
+                }
+
+                count += 1;
+                if count > 50 {
+                    ui.small("... affichage limité aux 50 premiers résultats. Précisez votre recherche.");
+                    break;
+                }
+
+                ui.horizontal(|ui| {
+                    let target_layer = AnatomyLayer::ALL[entry.layer_idx];
+                    if ui.small_button("👁").on_hover_text("Isoler cette structure dans la vue 3D").clicked() {
+                        layers.isolate(target_layer);
+                        selection.name = Some(entry.name.to_string());
+                        selection.layer = Some(target_layer);
+                        selection.info = entry.category;
+                    }
+                    ui.label(entry.category);
+                    ui.strong(entry.name);
+                });
+            }
+            if count == 0 {
+                ui.small("Aucune structure correspondante.");
+            }
         });
     });
 

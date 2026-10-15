@@ -21,29 +21,33 @@ OUTPUT_DIR = Path("crates/homo-app/assets/models")
 
 BASE_URL_ATLAS = "https://raw.githubusercontent.com/slorksmo/Human-Atlas/main/public/models"
 
-# 17 articulations squelettiques biomécaniques réelles (Segments osseux A -> B)
+# 21 articulations squelettiques biomécaniques réelles (Segments osseux A -> B)
 BONES = [
-    ("Hips",          np.array([ 0.000, 0.900,  0.000], dtype=np.float32), np.array([ 0.000, 1.050, -0.020], dtype=np.float32), None),
-    ("Spine",         np.array([ 0.000, 1.050, -0.020], dtype=np.float32), np.array([ 0.000, 1.220, -0.010], dtype=np.float32), "Hips"),
-    ("Thorax",        np.array([ 0.000, 1.220, -0.010], dtype=np.float32), np.array([ 0.000, 1.420,  0.000], dtype=np.float32), "Spine"),
+    ("Hips",          np.array([ 0.000, 0.900, -0.020], dtype=np.float32), np.array([ 0.000, 1.020, -0.030], dtype=np.float32), None),
+    ("Spine",         np.array([ 0.000, 1.020, -0.030], dtype=np.float32), np.array([ 0.000, 1.180, -0.020], dtype=np.float32), "Hips"),
+    ("Thorax",        np.array([ 0.000, 1.180, -0.020], dtype=np.float32), np.array([ 0.000, 1.420,  0.000], dtype=np.float32), "Spine"),
     ("Neck",          np.array([ 0.000, 1.420,  0.000], dtype=np.float32), np.array([ 0.000, 1.500,  0.010], dtype=np.float32), "Thorax"),
     ("Head",          np.array([ 0.000, 1.500,  0.010], dtype=np.float32), np.array([ 0.000, 1.720,  0.020], dtype=np.float32), "Neck"),
     
-    ("LeftThigh",     np.array([ 0.091, 0.900, -0.022], dtype=np.float32), np.array([ 0.083, 0.450,  0.005], dtype=np.float32), "Hips"),
-    ("LeftCalf",      np.array([ 0.083, 0.450,  0.005], dtype=np.float32), np.array([ 0.083, 0.080, -0.010], dtype=np.float32), "LeftThigh"),
-    ("LeftFoot",      np.array([ 0.083, 0.080, -0.010], dtype=np.float32), np.array([ 0.083, 0.020,  0.120], dtype=np.float32), "LeftCalf"),
-    
-    ("RightThigh",    np.array([-0.092, 0.900, -0.022], dtype=np.float32), np.array([-0.083, 0.450,  0.005], dtype=np.float32), "Hips"),
-    ("RightCalf",     np.array([-0.083, 0.450,  0.005], dtype=np.float32), np.array([-0.083, 0.080, -0.010], dtype=np.float32), "RightThigh"),
-    ("RightFoot",     np.array([-0.083, 0.080, -0.010], dtype=np.float32), np.array([-0.083, 0.020,  0.120], dtype=np.float32), "RightCalf"),
-    
-    ("LeftUpperArm",  np.array([ 0.180, 1.380, -0.025], dtype=np.float32), np.array([ 0.245, 1.110, -0.010], dtype=np.float32), "Thorax"),
+    ("LeftClavicle",  np.array([ 0.020, 1.410,  0.005], dtype=np.float32), np.array([ 0.170, 1.390, -0.025], dtype=np.float32), "Thorax"),
+    ("LeftUpperArm",  np.array([ 0.170, 1.390, -0.025], dtype=np.float32), np.array([ 0.245, 1.110, -0.010], dtype=np.float32), "LeftClavicle"),
     ("LeftForearm",   np.array([ 0.245, 1.110, -0.010], dtype=np.float32), np.array([ 0.250, 0.880,  0.000], dtype=np.float32), "LeftUpperArm"),
     ("LeftHand",      np.array([ 0.250, 0.880,  0.000], dtype=np.float32), np.array([ 0.260, 0.720,  0.000], dtype=np.float32), "LeftForearm"),
     
-    ("RightUpperArm", np.array([-0.180, 1.380, -0.025], dtype=np.float32), np.array([-0.245, 1.110, -0.010], dtype=np.float32), "Thorax"),
+    ("RightClavicle", np.array([-0.020, 1.410,  0.005], dtype=np.float32), np.array([-0.170, 1.390, -0.025], dtype=np.float32), "Thorax"),
+    ("RightUpperArm", np.array([-0.170, 1.390, -0.025], dtype=np.float32), np.array([-0.245, 1.110, -0.010], dtype=np.float32), "RightClavicle"),
     ("RightForearm",  np.array([-0.245, 1.110, -0.010], dtype=np.float32), np.array([-0.250, 0.880,  0.000], dtype=np.float32), "RightUpperArm"),
     ("RightHand",     np.array([-0.250, 0.880,  0.000], dtype=np.float32), np.array([-0.260, 0.720,  0.000], dtype=np.float32), "RightForearm"),
+    
+    ("LeftThigh",     np.array([ 0.091, 0.900, -0.022], dtype=np.float32), np.array([ 0.083, 0.450,  0.005], dtype=np.float32), "Hips"),
+    ("LeftCalf",      np.array([ 0.083, 0.450,  0.005], dtype=np.float32), np.array([ 0.083, 0.080, -0.010], dtype=np.float32), "LeftThigh"),
+    ("LeftFoot",      np.array([ 0.083, 0.080, -0.010], dtype=np.float32), np.array([ 0.083, 0.035,  0.065], dtype=np.float32), "LeftCalf"),
+    ("LeftToes",      np.array([ 0.083, 0.035,  0.065], dtype=np.float32), np.array([ 0.083, 0.015,  0.135], dtype=np.float32), "LeftFoot"),
+    
+    ("RightThigh",    np.array([-0.092, 0.900, -0.022], dtype=np.float32), np.array([-0.083, 0.450,  0.005], dtype=np.float32), "Hips"),
+    ("RightCalf",     np.array([-0.083, 0.450,  0.005], dtype=np.float32), np.array([-0.083, 0.080, -0.010], dtype=np.float32), "RightThigh"),
+    ("RightFoot",     np.array([-0.083, 0.080, -0.010], dtype=np.float32), np.array([-0.083, 0.035,  0.065], dtype=np.float32), "RightCalf"),
+    ("RightToes",     np.array([-0.083, 0.035,  0.065], dtype=np.float32), np.array([-0.083, 0.015,  0.135], dtype=np.float32), "RightFoot"),
 ]
 
 BONE_NAMES = [b[0] for b in BONES]
@@ -114,6 +118,8 @@ def classify_layer_male(p: dict) -> str:
     if sys in ["respiratory", "digestive", "urinary", "endocrine", "lymphatic", "reproductive"]:
         return "Viscera"
     if sys == "connective":
+        if any(w in name for w in ["tendon", "aponeurosis"]):
+            return "Muscles"
         return "Skeleton"
     return "Viscera"
 
@@ -139,14 +145,16 @@ def classify_layer_female(p: dict) -> str:
     if sys in ["respiratory", "digestive", "urinary", "endocrine", "lymphatic", "reproductive", "pregnancy"]:
         return "Viscera"
     if sys == "connective":
+        if any(w in name for w in ["tendon", "aponeurosis"]):
+            return "Muscles"
         return "Skeleton"
     return "Viscera"
 
 TRUNK_BONES = {'Hips', 'Spine', 'Thorax', 'Neck', 'Head'}
-ARM_L_BONES = {'LeftUpperArm', 'LeftForearm', 'LeftHand'}
-ARM_R_BONES = {'RightUpperArm', 'RightForearm', 'RightHand'}
-LEG_L_BONES = {'LeftThigh', 'LeftCalf', 'LeftFoot'}
-LEG_R_BONES = {'RightThigh', 'RightCalf', 'RightFoot'}
+ARM_L_BONES = {'LeftClavicle', 'LeftUpperArm', 'LeftForearm', 'LeftHand'}
+ARM_R_BONES = {'RightClavicle', 'RightUpperArm', 'RightForearm', 'RightHand'}
+LEG_L_BONES = {'LeftThigh', 'LeftCalf', 'LeftFoot', 'LeftToes'}
+LEG_R_BONES = {'RightThigh', 'RightCalf', 'RightFoot', 'RightToes'}
 
 is_trunk = np.array([b[0] in TRUNK_BONES for b in BONES])
 is_arm_l = np.array([b[0] in ARM_L_BONES for b in BONES])

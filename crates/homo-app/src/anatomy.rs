@@ -9,7 +9,7 @@ use bevy::prelude::*;
 
 use crate::layers::{AnatomyLayer, BaseColor, FemaleModel, MaleModel};
 
-/// Articulations squelettiques et biomécaniques réelles du corps humain.
+/// Articulations squelettiques et biomécaniques réelles du corps humain (21 segments articulés).
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum BodyJoint {
     Hips,
@@ -17,18 +17,22 @@ pub enum BodyJoint {
     Thorax,
     Neck,
     Head,
-    LeftThigh,
-    LeftCalf,
-    LeftFoot,
-    RightThigh,
-    RightCalf,
-    RightFoot,
+    LeftClavicle,
     LeftUpperArm,
     LeftForearm,
     LeftHand,
+    RightClavicle,
     RightUpperArm,
     RightForearm,
     RightHand,
+    LeftThigh,
+    LeftCalf,
+    LeftFoot,
+    LeftToes,
+    RightThigh,
+    RightCalf,
+    RightFoot,
+    RightToes,
 }
 
 impl BodyJoint {
@@ -39,18 +43,22 @@ impl BodyJoint {
             "Thorax" => Some(BodyJoint::Thorax),
             "Neck" => Some(BodyJoint::Neck),
             "Head" => Some(BodyJoint::Head),
-            "LeftThigh" => Some(BodyJoint::LeftThigh),
-            "LeftCalf" => Some(BodyJoint::LeftCalf),
-            "LeftFoot" => Some(BodyJoint::LeftFoot),
-            "RightThigh" => Some(BodyJoint::RightThigh),
-            "RightCalf" => Some(BodyJoint::RightCalf),
-            "RightFoot" => Some(BodyJoint::RightFoot),
+            "LeftClavicle" => Some(BodyJoint::LeftClavicle),
             "LeftUpperArm" => Some(BodyJoint::LeftUpperArm),
             "LeftForearm" => Some(BodyJoint::LeftForearm),
             "LeftHand" => Some(BodyJoint::LeftHand),
+            "RightClavicle" => Some(BodyJoint::RightClavicle),
             "RightUpperArm" => Some(BodyJoint::RightUpperArm),
             "RightForearm" => Some(BodyJoint::RightForearm),
             "RightHand" => Some(BodyJoint::RightHand),
+            "LeftThigh" => Some(BodyJoint::LeftThigh),
+            "LeftCalf" => Some(BodyJoint::LeftCalf),
+            "LeftFoot" => Some(BodyJoint::LeftFoot),
+            "LeftToes" => Some(BodyJoint::LeftToes),
+            "RightThigh" => Some(BodyJoint::RightThigh),
+            "RightCalf" => Some(BodyJoint::RightCalf),
+            "RightFoot" => Some(BodyJoint::RightFoot),
+            "RightToes" => Some(BodyJoint::RightToes),
             _ => None,
         }
     }

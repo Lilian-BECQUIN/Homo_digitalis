@@ -3,6 +3,7 @@
 
 mod activity;
 mod anatomy;
+pub mod anatomy_catalog;
 mod camera;
 mod layers;
 mod runner;

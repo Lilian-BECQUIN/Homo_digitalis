@@ -182,13 +182,18 @@ fn animate_biomechanics(
     let mut neck_rot = Quat::IDENTITY;
     let mut head_rot = Quat::IDENTITY;
 
+    let mut l_clavicle_rot = Quat::IDENTITY;
+    let mut r_clavicle_rot = Quat::IDENTITY;
+
     let mut l_thigh_rot = Quat::IDENTITY;
     let mut l_calf_rot = Quat::IDENTITY;
     let mut l_foot_rot = Quat::IDENTITY;
+    let mut l_toes_rot = Quat::IDENTITY;
 
     let mut r_thigh_rot = Quat::IDENTITY;
     let mut r_calf_rot = Quat::IDENTITY;
     let mut r_foot_rot = Quat::IDENTITY;
+    let mut r_toes_rot = Quat::IDENTITY;
 
     let mut l_upperarm_rot = Quat::IDENTITY;
     let mut l_forearm_rot = Quat::IDENTITY;
@@ -202,9 +207,14 @@ fn animate_biomechanics(
         ActivityType::Idle => {
             let resp = (t * 0.233 * TAU).sin();
             hips_offset.y = resp * 0.003;
+            spine_rot = Quat::from_rotation_x(resp * 0.006);
             thorax_rot = Quat::from_rotation_x(resp * 0.012);
             hips_rot = Quat::from_euler(EulerRot::YXZ, (t * 0.35).sin() * 0.005, resp * 0.004, (t * 0.25).cos() * 0.003);
             
+            // Clavicules légèrement relâchées
+            l_clavicle_rot = Quat::from_euler(EulerRot::YXZ, 0.0, 0.0, -0.015);
+            r_clavicle_rot = Quat::from_euler(EulerRot::YXZ, 0.0, 0.0, 0.015);
+
             // Bras naturellement relâchés le long du corps
             l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, 0.0, 0.0, 0.06);
             r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, 0.0, 0.0, -0.06);
@@ -227,6 +237,7 @@ fn animate_biomechanics(
             hips_offset.x = sway * 0.018;
 
             hips_rot = Quat::from_euler(EulerRot::YXZ, -sway * 0.045, 0.020, -sway * 0.025);
+            spine_rot = Quat::from_euler(EulerRot::YXZ, -sway * 0.018, 0.008, -sway * 0.010);
             thorax_rot = Quat::from_euler(EulerRot::YXZ, sway * 0.040, -0.010, 0.0);
 
             // Flexion / extension hanches (négatif = jambe vers l'avant)
@@ -239,12 +250,18 @@ fn animate_biomechanics(
             l_calf_rot = Quat::from_rotation_x(l_knee);
             r_calf_rot = Quat::from_rotation_x(r_knee);
 
-            // Chevilles
+            // Chevilles et orteils (impulsion de propulsion plantaire)
             l_foot_rot = Quat::from_rotation_x(phi_l.sin() * 0.16);
             r_foot_rot = Quat::from_rotation_x(phi_r.sin() * 0.16);
 
+            l_toes_rot = Quat::from_rotation_x((phi_l.sin()).max(0.0) * 0.35);
+            r_toes_rot = Quat::from_rotation_x((phi_r.sin()).max(0.0) * 0.35);
+
+            // Rythme scapulo-huméral : les clavicules protractent et élèvent avec le balancement
+            l_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_l.sin() * 0.05, 0.0, -0.02 + phi_l.sin() * 0.025);
+            r_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_r.sin() * 0.05, 0.0, 0.02 - phi_r.sin() * 0.025);
+
             // Balancement des bras en opposition croisée stricte
-            // (Jambe G en avant <=> Bras G en arrière (+X), Bras D en avant (-X))
             l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_l.sin() * 0.35, 0.0, 0.08);
             r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_r.sin() * 0.35, 0.0, -0.08);
             
@@ -273,8 +290,9 @@ fn animate_biomechanics(
             hips_offset.y = bounce * if is_sprint { 0.065 } else { 0.045 };
             hips_offset.x = sway * 0.022;
 
-            // Buste penché vers l'avant et torsion pelvienne coordonnée
+            // Buste penché vers l'avant et torsion pelvienne / lombaire / thoracique coordonnée
             hips_rot = Quat::from_euler(EulerRot::YXZ, -sway * 0.065, -pitch, -sway * 0.040);
+            spine_rot = Quat::from_euler(EulerRot::YXZ, -sway * 0.028, -pitch * 0.6, -sway * 0.015);
             thorax_rot = Quat::from_euler(EulerRot::YXZ, sway * 0.075, -pitch * 0.5, 0.0);
 
             // Hanches : foulée puissante alternée
@@ -287,9 +305,18 @@ fn animate_biomechanics(
             l_calf_rot = Quat::from_rotation_x(l_knee);
             r_calf_rot = Quat::from_rotation_x(r_knee);
 
-            // Chevilles : impulsion plantaire
+            // Chevilles et orteils : poussée de propulsion athlétique
             l_foot_rot = Quat::from_rotation_x(phi_l.sin() * 0.28);
             r_foot_rot = Quat::from_rotation_x(phi_r.sin() * 0.28);
+
+            let a_toes = if is_sprint { 0.65 } else { 0.45 };
+            l_toes_rot = Quat::from_rotation_x((phi_l.sin()).max(0.0) * a_toes);
+            r_toes_rot = Quat::from_rotation_x((phi_r.sin()).max(0.0) * a_toes);
+
+            // Clavicules : engagement dynamique des épaules
+            let a_clav = if is_sprint { 0.10 } else { 0.06 };
+            l_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_l.sin() * a_clav, 0.0, -0.025 + phi_l.sin() * 0.04);
+            r_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_r.sin() * a_clav, 0.0, 0.025 - phi_r.sin() * 0.04);
 
             // Bras : pompage athlétique en opposition croisée
             l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_l.sin() * a_arm, 0.0, 0.10);
@@ -315,6 +342,7 @@ fn animate_biomechanics(
 
                 hips_offset.y = -s * 0.22;
                 hips_rot = Quat::from_rotation_x(-s * 0.16);
+                spine_rot = Quat::from_rotation_x(-s * 0.14);
                 thorax_rot = Quat::from_rotation_x(-s * 0.12);
 
                 l_thigh_rot = Quat::from_rotation_x(-s * 0.65); // hanches fléchies en avant
@@ -325,6 +353,12 @@ fn animate_biomechanics(
 
                 l_foot_rot = Quat::from_rotation_x(-s * 0.28);  // dorsiflexion
                 r_foot_rot = Quat::from_rotation_x(-s * 0.28);
+
+                l_toes_rot = Quat::from_rotation_x(-s * 0.12);
+                r_toes_rot = Quat::from_rotation_x(-s * 0.12);
+
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, s * 0.08, 0.0, -0.02);
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, s * 0.08, 0.0, 0.02);
 
                 // Bras armés en arrière (+X)
                 l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, s * 0.55, 0.0, 0.08);
@@ -341,6 +375,7 @@ fn animate_biomechanics(
 
                 hips_offset.y = -s * 0.22 + p * 0.08;
                 hips_rot = Quat::from_rotation_x(-s * 0.16 + p * 0.05);
+                spine_rot = Quat::from_rotation_x(-s * 0.14 + p * 0.05);
                 thorax_rot = Quat::from_rotation_x(-s * 0.12 + p * 0.05);
 
                 l_thigh_rot = Quat::from_rotation_x(-s * 0.65); // extension complète vers 0°
@@ -351,6 +386,12 @@ fn animate_biomechanics(
 
                 l_foot_rot = Quat::from_rotation_x(p * 0.55);   // poussée explosive sur la pointe
                 r_foot_rot = Quat::from_rotation_x(p * 0.55);
+
+                l_toes_rot = Quat::from_rotation_x(p * 0.68);   // propulsion puissante des orteils
+                r_toes_rot = Quat::from_rotation_x(p * 0.68);
+
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -p * 0.20, 0.0, 0.06);
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -p * 0.20, 0.0, -0.06);
 
                 // Bras projetés vigoureusement vers le haut (-X)
                 l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -p * 1.65, 0.0, 0.12);
@@ -368,6 +409,7 @@ fn animate_biomechanics(
 
                 hips_offset.y = 0.08 + arc * 0.40; // corps suspendu en l'air à +48 cm
                 hips_rot = Quat::IDENTITY;
+                spine_rot = Quat::IDENTITY;
                 thorax_rot = Quat::IDENTITY;
 
                 l_thigh_rot = Quat::from_rotation_x(-arc * 0.25); // jambes légèrement repliées
@@ -378,6 +420,12 @@ fn animate_biomechanics(
 
                 l_foot_rot = Quat::from_rotation_x(0.12);
                 r_foot_rot = Quat::from_rotation_x(0.12);
+
+                l_toes_rot = Quat::from_rotation_x(0.16);
+                r_toes_rot = Quat::from_rotation_x(0.16);
+
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.12 * (1.0 - p), 0.0, 0.04 * (1.0 - p));
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -0.12 * (1.0 - p), 0.0, -0.04 * (1.0 - p));
 
                 // Bras flottant au sommet puis redescendant
                 let arm_float = -(1.65 * (1.0 - p) + 0.40 * p);
@@ -395,6 +443,7 @@ fn animate_biomechanics(
 
                 hips_offset.y = -decel * 0.20;
                 hips_rot = Quat::from_rotation_x(-decel * 0.15);
+                spine_rot = Quat::from_rotation_x(-decel * 0.16);
                 thorax_rot = Quat::from_rotation_x(-decel * 0.18);
 
                 l_thigh_rot = Quat::from_rotation_x(-decel * 0.55);
@@ -405,6 +454,12 @@ fn animate_biomechanics(
 
                 l_foot_rot = Quat::from_rotation_x(-decel * 0.22);
                 r_foot_rot = Quat::from_rotation_x(-decel * 0.22);
+
+                l_toes_rot = Quat::from_rotation_x(-decel * 0.12);
+                r_toes_rot = Quat::from_rotation_x(-decel * 0.12);
+
+                l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -decel * 0.08, 0.0, 0.02);
+                r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -decel * 0.08, 0.0, -0.02);
 
                 // Bras fléchis en avant pour stabiliser le contrepoids
                 l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -decel * 0.50, 0.0, 0.08);
@@ -439,6 +494,7 @@ fn animate_biomechanics(
             hips_offset.z = -c * 0.14; // fessiers reculés pour équilibrer le centre de gravité
 
             hips_rot = Quat::from_rotation_x(-c * 0.18);
+            spine_rot = Quat::from_rotation_x(-c * 0.20);
             thorax_rot = Quat::from_rotation_x(-c * 0.22); // buste gainé incliné vers l'avant
 
             // Cuisses à l'horizontale (90°)
@@ -451,6 +507,10 @@ fn animate_biomechanics(
 
             l_foot_rot = Quat::from_rotation_x(-c * 0.32);
             r_foot_rot = Quat::from_rotation_x(-c * 0.32);
+
+            // Clavicules élévation stable
+            l_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -c * 0.15, 0.0, 0.04);
+            r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -c * 0.15, 0.0, -0.04);
 
             // Bras levés droit devant à l'horizontale pour contrepoids parfait
             l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -c * 1.45, 0.0, 0.08);
@@ -475,7 +535,7 @@ fn animate_biomechanics(
         }
     }
 
-    // 2. Application aux 15 articulations biomécaniques réelles
+    // 2. Application aux 21 articulations biomécaniques réelles
     for (joint, base_tf, mut tf) in &mut set.p1() {
         match joint {
             BodyJoint::Hips => {
@@ -494,6 +554,12 @@ fn animate_biomechanics(
             BodyJoint::Head => {
                 tf.rotation = base_tf.0.rotation * head_rot;
             }
+            BodyJoint::LeftClavicle => {
+                tf.rotation = base_tf.0.rotation * l_clavicle_rot;
+            }
+            BodyJoint::RightClavicle => {
+                tf.rotation = base_tf.0.rotation * r_clavicle_rot;
+            }
             BodyJoint::LeftThigh => {
                 tf.rotation = base_tf.0.rotation * l_thigh_rot;
             }
@@ -503,6 +569,9 @@ fn animate_biomechanics(
             BodyJoint::LeftFoot => {
                 tf.rotation = base_tf.0.rotation * l_foot_rot;
             }
+            BodyJoint::LeftToes => {
+                tf.rotation = base_tf.0.rotation * l_toes_rot;
+            }
             BodyJoint::RightThigh => {
                 tf.rotation = base_tf.0.rotation * r_thigh_rot;
             }
@@ -511,6 +580,9 @@ fn animate_biomechanics(
             }
             BodyJoint::RightFoot => {
                 tf.rotation = base_tf.0.rotation * r_foot_rot;
+            }
+            BodyJoint::RightToes => {
+                tf.rotation = base_tf.0.rotation * r_toes_rot;
             }
             BodyJoint::LeftUpperArm => {
                 tf.rotation = base_tf.0.rotation * l_upperarm_rot;

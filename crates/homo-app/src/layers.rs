@@ -153,6 +153,11 @@ impl LayerSettings {
         self.opacity[AnatomyLayer::Viscera.index()] = 1.0;
         self.opacity[AnatomyLayer::Heart.index()] = 1.0;
     }
+
+    pub fn isolate(&mut self, layer: AnatomyLayer) {
+        self.opacity = [0.0; 9];
+        self.opacity[layer.index()] = 1.0;
+    }
 }
 
 /// Couleur de base (sans alpha) d'une pièce anatomique ; modulée par les shaders physiologiques.
