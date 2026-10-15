@@ -2,6 +2,12 @@
 Cargo.lock.bak
 *.log
 .DS_Store
-# Assets bruts volumineux (sources Z-Anatomy / BodyParts3D, .blend) : voir docs/ASSET_PIPELINE.md
+# Cache de téléchargement des assets anatomiques
+/assets_cache/
+# Modèles 3D générés automatiquement par tools/build_anatomy.py
+crates/homo-app/assets/models/*.glb
+# Dossier de build Web
+crates/homo-app/dist/
+# Assets bruts volumineux (sources Z-Anatomy / BodyParts3D, .blend)
 /assets_src/
 *.blend1

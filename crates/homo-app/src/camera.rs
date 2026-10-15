@@ -36,7 +36,7 @@ fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::default(),
-        OrbitCamera::new(Vec3::new(0.0, 1.1, 0.0), 0.3, 0.1, 3.2),
+        OrbitCamera::new(Vec3::new(0.0, 0.88, 0.0), 0.25, 0.05, 2.85),
     ));
     commands.spawn((
         DirectionalLight {

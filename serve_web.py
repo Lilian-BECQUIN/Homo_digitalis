@@ -46,6 +46,8 @@ WasmHandler.extensions_map.update({
     ".wasm": "application/wasm",
     ".js": "application/javascript",
     ".html": "text/html",
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
 })
 
 print("=" * 60)

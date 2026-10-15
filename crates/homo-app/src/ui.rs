@@ -6,7 +6,7 @@ use bevy_egui::{egui, EguiContexts};
 use sim_core::{gas, Inputs, Status};
 
 use crate::anatomy::{OrganTag, Selection};
-use crate::layers::{AnatomyLayer, LayerSettings};
+use crate::layers::{AnatomyLayer, Gender, LayerSettings};
 use crate::runner::{Command, LiveTelemetry, SimHandle};
 
 const TIME_SCALES: [(&str, f64); 5] = [
@@ -91,6 +91,7 @@ fn hud(
     mut contexts: EguiContexts,
     mut state: ResMut<UiState>,
     mut layers: ResMut<LayerSettings>,
+    mut gender: ResMut<Gender>,
     live: Res<LiveTelemetry>,
     selection: Res<Selection>,
     handle: Res<SimHandle>,
@@ -157,23 +158,59 @@ fn hud(
         });
     });
 
-    // ------------------------------------------------------------ Gauche : environnement + calques
-    egui::SidePanel::left("environment").default_width(280.0).show(&ctx, |ui| {
-        ui.heading("Environnement");
-        ui.add(egui::Slider::new(&mut s.inputs.altitude_m, 0.0..=Inputs::MAX_ALTITUDE_M).text("Altitude").suffix(" m"));
-        let g = gas::compute(s.inputs.altitude_m);
-        ui.small(format!("PiO₂ = {:.0} mmHg · Patm = {:.0} mmHg", g.inspired_o2_mmhg, g.barometric_mmhg));
-        ui.add(egui::Slider::new(&mut s.inputs.effort, 0.0..=1.0).text("Effort physique"));
-        ui.add_space(6.0);
-        ui.label("Phases ultérieures (inactif) :");
-        ui.add_enabled(false, egui::Slider::new(&mut s.ambient_temp_c, -20.0..=50.0).text("Température").suffix(" °C"));
-        ui.add_enabled(false, egui::Slider::new(&mut s.humidity_pct, 0.0..=100.0).text("Humidité").suffix(" %"));
-        ui.add_enabled(false, egui::Slider::new(&mut s.gravity_g, 0.0..=3.0).text("Gravité").suffix(" g"));
+    // ------------------------------------------------------------ Gauche : sujet + isolation + calques
+    egui::SidePanel::left("environment").default_width(310.0).show(&ctx, |ui| {
+        ui.heading("Sujet Anatomique");
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut *gender, Gender::Male, "👨 Homme (Adulte)");
+            ui.selectable_value(&mut *gender, Gender::Female, "👩 Femme (Adulte)");
+        });
         ui.separator();
-        ui.heading("Calques anatomiques");
+
+        ui.heading("Filtres & Isolation Rapide (Solo)");
         let mut layers_changed = false;
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("🧬 Écorché complet").on_hover_text("Enveloppe cutanée translucide laissant voir les muscles, organes et squelette").clicked() {
+                layers.preset_all();
+                layers_changed = true;
+            }
+            if ui.button("🧍 Peau opaque").on_hover_text("Corps complet extérieur").clicked() {
+                layers.preset_skin_only();
+                layers_changed = true;
+            }
+            if ui.button("🦴 Os & Squelette").on_hover_text("Squelette complet et boîte crânienne").clicked() {
+                layers.preset_skeleton_only();
+                layers_changed = true;
+            }
+            if ui.button("🏛 Vertèbres seules").on_hover_text("Rachis complet (cervical, thoracique, lombaire, sacrum, coccyx)").clicked() {
+                layers.preset_vertebrae_only();
+                layers_changed = true;
+            }
+            if ui.button("💪 Muscles seuls").on_hover_text("Système musculaire squelettique").clicked() {
+                layers.preset_muscles_only();
+                layers_changed = true;
+            }
+            if ui.button("🩸 Vasculaire complet").on_hover_text("Cœur + toutes les artères et veines").clicked() {
+                layers.preset_vascular_only();
+                layers_changed = true;
+            }
+            if ui.button("💙 Veines seules").on_hover_text("Réseau veineux complet de retour").clicked() {
+                layers.preset_veins_only();
+                layers_changed = true;
+            }
+            if ui.button("⚡ Système nerveux").on_hover_text("Encéphale, moelle épinière et troncs nerveux").clicked() {
+                layers.preset_nervous_only();
+                layers_changed = true;
+            }
+            if ui.button("🫁 Organes internes").on_hover_text("Poumons, cœur, foie, estomac, intestins, reins").clicked() {
+                layers.preset_viscera_only();
+                layers_changed = true;
+            }
+        });
+        ui.separator();
+
+        ui.heading("Calques Anatomiques (Opacité)");
         {
-            // Évite de marquer la ressource « modifiée » à chaque frame (réécriture des matériaux).
             let opacity = &mut layers.bypass_change_detection().opacity;
             for layer in AnatomyLayer::ALL {
                 layers_changed |= ui
@@ -184,7 +221,15 @@ fn hud(
         if layers_changed {
             layers.set_changed();
         }
-        ui.small("Clic gauche : sélection (calques ≥ 60 % d'opacité) · clic droit : orbite · clic milieu : pan · molette : zoom");
+        ui.separator();
+
+        ui.heading("Environnement & Effort");
+        ui.add(egui::Slider::new(&mut s.inputs.altitude_m, 0.0..=Inputs::MAX_ALTITUDE_M).text("Altitude").suffix(" m"));
+        let g = gas::compute(s.inputs.altitude_m);
+        ui.small(format!("PiO₂ = {:.0} mmHg · Patm = {:.0} mmHg", g.inspired_o2_mmhg, g.barometric_mmhg));
+        ui.add(egui::Slider::new(&mut s.inputs.effort, 0.0..=1.0).text("Effort physique"));
+        ui.add_space(6.0);
+        ui.small("Souris : Clic gauche = sélection · Clic droit = orbite · Clic milieu = pan · Molette = zoom");
     });
 
     // ------------------------------------------------------------ Droite : inspecteur

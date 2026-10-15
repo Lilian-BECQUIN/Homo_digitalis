@@ -1,29 +1,41 @@
-# Pipeline d'assets 3D (Phase 1b)
+# Pipeline d'assets 3D Réalistes (Phase 1b)
 
-Objectif : remplacer les primitives procédurales de `crates/homo-app/src/anatomy.rs` par des
-maillages anatomiques segmentés, **en conservant la nomenclature exacte**.
+Ce pipeline intègre des modèles 3D anatomiques humains réalistes (Homme et Femme) segmentés à partir de données d'imagerie médicale (IRM et atlas anatomiques peer-reviewed).
 
-## Sources (open-source)
-- **Z-Anatomy** (CC BY-SA 4.0) — fichier `.blend`, noms TA2 par structure.
-- **BodyParts3D** (CC BY-SA 2.1 JP) — OBJ par structure FMA.
+## Sources scientifiques et licences
+- **Homme (Adult Male)** : **BodyParts3D 4.0** (Database Center for Life Science, CC BY 4.0).
+  - 2 234 pièces anatomiques segmentées, 2,28 millions de triangles.
+  - Couverture complète : squelette osseux, colonne vertébrale (rachis C1-L5 + sacrum), système musculaire, arbre artériel, réseau veineux de retour, système nerveux central et périphérique, organes internes (viscères), enveloppe cutanée complète.
+- **Femme (Adult Female)** : **Human Reference Atlas (HuBMAP) v1.10** (Browne & Schlehlein, CC BY 4.0).
+  - 1 220 structures segmentées, 2,76 millions de triangles.
+  - Couverture complète adaptée : squelette, colonne vertébrale, musculature, cerveau subdivisé, viscères, système vasculaire, enveloppe cutanée féminine.
 
-> Respecter les licences : le dépôt doit contenir l'attribution et rester sous une licence
-> compatible (partage à l'identique) pour les assets dérivés.
+## Script automatisé : `tools/build_anatomy.py`
+Le script télécharge et assemble les maillages binaires en deux fichiers glTF 2.0 binaires optimisés :
+- `crates/homo-app/assets/models/human_male.glb`
+- `crates/homo-app/assets/models/human_female.glb`
 
-## Étapes Blender
-1. Placer les sources dans `assets_src/` (ignoré par git).
-2. Importer, ne garder que les 6 calques : peau, muscles, squelette, vaisseaux+cœur, nerfs, viscères.
-3. Conserver le **nom d'objet exact** (TA2) : il devient le composant `Name` côté Bevy.
-4. Décimer (Modifier *Decimate* ratio 0,1–0,3) en gardant les UV ; créer LOD0/LOD1/LOD2
-   (`nom.LOD1`…). Viser < 500 k triangles au total pour LOD0.
-5. Cœur : créer un *shape key* « Systole » (morph target) ; aorte/artères : shape key « Pulse ».
-6. Organiser en collections `Layer_Skin`, `Layer_Muscle`, `Layer_Skeleton`, `Layer_Vascular`,
-   `Layer_Nervous`, `Layer_Viscera`, avec propriété personnalisée `organ_tag` (`heart`, `artery`, `vein`).
-7. Exporter en **glTF 2.0 binaire** vers `crates/homo-app/assets/models/anatomy.glb`
-   (« +Y up », shape keys et extras activés).
+Chaque fichier contient 9 nœuds majeurs standardisés correspondant aux composants Bevy :
+1. **Skin** (`AnatomyLayer::Skin`) : enveloppe cutanée extérieure (corps complet).
+2. **Vertebrae** (`AnatomyLayer::Vertebrae`) : rachis complet (7 cervicales, 12 thoraciques, 5 lombaires, sacrum et coccyx).
+3. **Skeleton** (`AnatomyLayer::Skeleton`) : crâne, cage thoracique (sternum, côtes I-XII), ceintures et membres osseux.
+4. **Muscles** (`AnatomyLayer::Muscle`) : ensemble des muscles squelettiques (pectoraux, deltoïdes, biceps, abdominaux, fessiers, quadriceps...).
+5. **Heart** (`AnatomyLayer::Heart`) : myocarde, oreillettes, ventricules (animé avec la simulation Suga/élastance).
+6. **Arteries** (`AnatomyLayer::Arteries`) : arbre artériel pulsatile (aorte, carotides, fémorales...).
+7. **Veins** (`AnatomyLayer::Veins`) : réseau veineux complet (veines caves supérieure/inférieure, jugulaires, rénales, fémorales...).
+8. **Nervous** (`AnatomyLayer::Nervous`) : encéphale, cervelet, moelle épinière et troncs nerveux périphériques.
+9. **Viscera** (`AnatomyLayer::Viscera`) : poumons, foie, estomac, intestins, reins, vessie.
 
-## Intégration Bevy
-Charger le glb comme `SceneRoot`, puis un système `Added<Name>` attache `AnatomyLayer`
-(d'après la collection), `Organ`, `BaseColor`, `PickingBehavior`, `BaseScale` et l'observer
-`on_click` — exactement les mêmes composants que `spawn_anatomy` aujourd'hui, de sorte que
-`layers.rs`, `visuals.rs` et `ui.rs` ne changent pas.
+## Modes de visualisation et d'isolation (Solo)
+- **Sélecteur Homme / Femme** : bascule instantanée entre les anatomies masculine et féminine.
+- **Boutons Solo** :
+  - *Squelette complet*
+  - *Vertèbres seules*
+  - *Muscles seuls*
+  - *Système vasculaire complet (Artères + Veines + Cœur)*
+  - *Toutes les veines seules*
+  - *Système nerveux seul*
+  - *Organes internes seuls*
+  - *Corps complet (Peau opaque)*
+  - *Corps complet (Écorché translucide)*
+- **Curseurs d'opacité** : contrôle continu 0 % à 100 % sur chacun des 9 calques.

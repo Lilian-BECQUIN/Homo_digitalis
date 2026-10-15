@@ -29,6 +29,25 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install numpy
+
+      - name: Cache 3D Anatomy Assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets_cache
+            crates/homo-app/assets/models
+          key: anatomy-assets-v1
+
+      - name: Generate 3D Anatomy Models
+        run: python tools/build_anatomy.py
+
       - name: Install Trunk CLI
         uses: jetli/trunk-action@v0.5.1
         with:

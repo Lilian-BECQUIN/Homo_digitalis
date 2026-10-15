@@ -1,5 +1,5 @@
 //! Liaison simulation → shaders/animations : le cœur bat avec le volume ventriculaire simulé,
-//! les artères pulsent avec la pression, la couleur du sang suit la saturation en O₂.
+//! les artères pulsent avec la pression systolique, la couleur du sang suit la saturation en O₂.
 
 use bevy::prelude::*;
 
@@ -9,20 +9,27 @@ use crate::runner::LiveTelemetry;
 
 fn animate_heart(live: Res<LiveTelemetry>, mut query: Query<(&BaseScale, &mut Transform), With<HeartMarker>>) {
     let t = &live.current;
-    // Contraction géométrique (équivalent d'un morph target) pilotée par le volume du VG.
+    // Contraction géométrique pilotée par le volume du VG simulé
     let fill = ((t.lv_volume_ml - 90.0) / 60.0).clamp(-1.0, 1.0);
-    let k = 1.0 + 0.12 * fill;
+    let k = 1.0 + 0.05 * fill;
+    let center = Vec3::new(0.02, 1.35, 0.0);
     for (base, mut tf) in &mut query {
         tf.scale = base.0 * k;
+        tf.translation = center * (1.0 - k);
     }
 }
 
-fn pulse_vessels(live: Res<LiveTelemetry>, mut query: Query<(&BaseScale, &mut Transform), With<Pulsatile>>) {
+fn pulse_vessels(
+    live: Res<LiveTelemetry>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    query: Query<&MeshMaterial3d<StandardMaterial>, With<Pulsatile>>,
+) {
     let t = &live.current;
-    let pulse = ((t.arterial_pressure_mmhg - 80.0) / 80.0).clamp(-0.5, 1.0);
-    let k = 1.0 + 0.18 * pulse;
-    for (base, mut tf) in &mut query {
-        tf.scale = Vec3::new(base.0.x * k, base.0.y, base.0.z * k);
+    let pulse = ((t.arterial_pressure_mmhg - 75.0) / 65.0).clamp(0.0, 1.0);
+    for mat in &query {
+        if let Some(m) = materials.get_mut(&mat.0) {
+            m.emissive = LinearRgba::new(0.35 * pulse, 0.03 * pulse, 0.03 * pulse, 1.0);
+        }
     }
 }
 
