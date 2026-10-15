@@ -37,13 +37,11 @@ jobs:
       - name: Install Python dependencies
         run: pip install numpy
 
-      - name: Cache 3D Anatomy Assets
+      - name: Cache Raw Atlas Chunks
         uses: actions/cache@v4
         with:
-          path: |
-            assets_cache
-            crates/homo-app/assets/models
-          key: anatomy-assets-v1
+          path: assets_cache
+          key: raw-atlas-chunks-v1
 
       - name: Generate 3D Anatomy Models
         run: python tools/build_anatomy.py
