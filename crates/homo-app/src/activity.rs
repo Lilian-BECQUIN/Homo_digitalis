@@ -160,13 +160,15 @@ fn update_activity_physics(
 /// bougent en parfaite cohérence.
 #[allow(clippy::type_complexity)]
 fn animate_biomechanics(
-    time: Res<Time>,
+    _time: Res<Time>,
     gender: Res<Gender>,
     mut act: ResMut<ActivityState>,
-    mut model_query: Query<(&mut Transform, Option<&MaleModel>, Option<&FemaleModel>)>,
-    mut vertebrae_query: Query<(&BaseScale, &mut Transform), (With<VertebraeMarker>, Without<MaleModel>, Without<FemaleModel>)>,
-    mut viscera_query: Query<(&BaseScale, &mut Transform), (With<VisceraMarker>, Without<MaleModel>, Without<FemaleModel>)>,
-    mut muscles_query: Query<(&BaseScale, &mut Transform), (With<MusclesMarker>, Without<MaleModel>, Without<FemaleModel>)>,
+    mut transforms: ParamSet<(
+        Query<(&mut Transform, Option<&MaleModel>, Option<&FemaleModel>)>,
+        Query<(&BaseScale, &mut Transform), With<VertebraeMarker>>,
+        Query<(&BaseScale, &mut Transform), With<VisceraMarker>>,
+        Query<(&BaseScale, &mut Transform), With<MusclesMarker>>,
+    )>,
 ) {
     let t = act.cycle_time;
     let jt = act.jump_timer;
@@ -281,7 +283,7 @@ fn animate_biomechanics(
     act.impact_g = current_g;
 
     // 1. Application aux modèles racines (Homme / Femme) : tous les 9 calques bougent ensemble !
-    for (mut tf, male, female) in &mut model_query {
+    for (mut tf, male, female) in &mut transforms.p0() {
         let is_active = (*gender == Gender::Male && male.is_some())
             || (*gender == Gender::Female && female.is_some());
         if is_active {
@@ -291,7 +293,7 @@ fn animate_biomechanics(
     }
 
     // 2. Colonne vertébrale (Vertebrae) : micro-compression élastique à chaque impact
-    for (base, mut tf) in &mut vertebrae_query {
+    for (base, mut tf) in &mut transforms.p1() {
         let comp = vert_compression.clamp(0.0, 0.12);
         tf.scale = Vec3::new(
             base.0.x * (1.0 + comp * 0.35),
@@ -305,7 +307,7 @@ fn animate_biomechanics(
     let breath_wave = (t * resp_hz * core::f32::consts::TAU).sin();
     let effort_factor = 1.0 + act.current_effort as f32 * 0.8;
     let breath_expand = breath_wave * 0.045 * effort_factor;
-    for (base, mut tf) in &mut viscera_query {
+    for (base, mut tf) in &mut transforms.p2() {
         tf.scale = Vec3::new(
             base.0.x * (1.0 + breath_expand * 0.8),
             base.0.y * (1.0 + breath_expand * 0.4),
@@ -315,7 +317,7 @@ fn animate_biomechanics(
 
     // 4. Muscles : contraction et tonus musculaire d'effort
     let muscle_pump = 1.0 + (act.current_effort as f32) * 0.05;
-    for (base, mut tf) in &mut muscles_query {
+    for (base, mut tf) in &mut transforms.p3() {
         tf.scale = Vec3::new(
             base.0.x * muscle_pump,
             base.0.y,
