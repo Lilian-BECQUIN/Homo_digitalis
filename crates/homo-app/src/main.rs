@@ -18,7 +18,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Homo Digitalis — simulateur physiologique (éducatif)".into(),
-                resolution: (1600., 900.).into(),
+                resolution: (1600.0_f32, 900.0_f32).into(),
                 #[cfg(target_arch = "wasm32")]
                 fit_canvas_to_parent: true,
                 #[cfg(target_arch = "wasm32")]

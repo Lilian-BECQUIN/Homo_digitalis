@@ -200,9 +200,10 @@ fn wasm_sim_tick(
 
     let real_dt = (time.delta_secs_f64()).min(0.1);
     if !state.paused {
-        let dt = recommended_dt(state.scale);
-        state.sim.set_sample_interval((0.005 * state.scale).max(dt));
-        state.sim.advance(real_dt * state.scale, dt, MAX_STEPS_PER_FRAME_WEB);
+        let scale = state.scale;
+        let dt = recommended_dt(scale);
+        state.sim.set_sample_interval((0.005 * scale).max(dt));
+        state.sim.advance(real_dt * scale, dt, MAX_STEPS_PER_FRAME_WEB);
     }
 
     live.current = state.sim.telemetry();

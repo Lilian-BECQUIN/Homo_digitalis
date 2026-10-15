@@ -78,7 +78,7 @@ fn scope(ui: &mut egui::Ui, title: &str, values: &[f32], lo: f32, hi: f32, color
             egui::pos2(x, rect.bottom() - 2.0 - t * (rect.height() - 4.0))
         })
         .collect();
-    painter.add(egui::Shape::line(points, egui::Stroke::new(1.5, color)));
+    painter.add(egui::Shape::line(points, egui::Stroke::new(1.5_f32, color)));
 }
 
 fn clock(seconds: f64) -> String {
