@@ -41,6 +41,8 @@ jobs:
   wasm-check:
     name: homo-app (WASM check)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: '--cfg getrandom_backend="wasm_js"'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

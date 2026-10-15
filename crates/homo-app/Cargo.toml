@@ -17,4 +17,5 @@ bevy_egui = "0.32"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 bevy = { version = "0.15", features = ["webgl2"] }
-getrandom = { version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom_v2 = { package = "getrandom", version = "0.2", features = ["js"] }

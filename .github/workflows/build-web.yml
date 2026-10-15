@@ -18,6 +18,8 @@ jobs:
   build-web:
     name: Build WebAssembly (Trunk)
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: '--cfg getrandom_backend="wasm_js"'
     steps:
       - uses: actions/checkout@v4
 
