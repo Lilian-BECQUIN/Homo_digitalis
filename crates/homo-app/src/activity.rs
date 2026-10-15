@@ -215,9 +215,9 @@ fn animate_biomechanics(
             l_clavicle_rot = Quat::from_euler(EulerRot::YXZ, 0.0, 0.0, -0.015);
             r_clavicle_rot = Quat::from_euler(EulerRot::YXZ, 0.0, 0.0, 0.015);
 
-            // Bras naturellement relâchés le long du corps
-            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, 0.0, 0.0, 0.06);
-            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, 0.0, 0.0, -0.06);
+            // Bras naturellement relâchés le long du corps avec dégagement du torse
+            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, 0.0, 0.0, 0.12);
+            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, 0.0, 0.0, -0.12);
             l_forearm_rot = Quat::from_rotation_x(-0.10);
             r_forearm_rot = Quat::from_rotation_x(-0.10);
             
@@ -261,9 +261,9 @@ fn animate_biomechanics(
             l_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_l.sin() * 0.05, 0.0, -0.02 + phi_l.sin() * 0.025);
             r_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_r.sin() * 0.05, 0.0, 0.02 - phi_r.sin() * 0.025);
 
-            // Balancement des bras en opposition croisée stricte
-            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_l.sin() * 0.35, 0.0, 0.08);
-            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_r.sin() * 0.35, 0.0, -0.08);
+            // Balancement des bras en opposition croisée stricte avec dégagement du torse
+            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_l.sin() * 0.35, 0.0, 0.14);
+            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_r.sin() * 0.35, 0.0, -0.14);
             
             // Coudes fléchis vers l'avant (négatif)
             l_forearm_rot = Quat::from_rotation_x(-0.45);
@@ -318,9 +318,9 @@ fn animate_biomechanics(
             l_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_l.sin() * a_clav, 0.0, -0.025 + phi_l.sin() * 0.04);
             r_clavicle_rot = Quat::from_euler(EulerRot::YXZ, -phi_r.sin() * a_clav, 0.0, 0.025 - phi_r.sin() * 0.04);
 
-            // Bras : pompage athlétique en opposition croisée
-            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_l.sin() * a_arm, 0.0, 0.10);
-            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_r.sin() * a_arm, 0.0, -0.10);
+            // Bras : pompage athlétique en opposition croisée avec dégagement du torse
+            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_l.sin() * a_arm, 0.0, 0.16);
+            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, phi_r.sin() * a_arm, 0.0, -0.16);
             
             // Coudes maintenus en flexion athlétique vers l'avant (angle ~85°)
             let elbow_flex = if is_sprint { -1.50 } else { -1.35 };
@@ -363,8 +363,8 @@ fn animate_biomechanics(
 
                 // Bras armés en arrière (+X)
                 let arm_angle = s * 0.45;
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.08);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.08);
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.14);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.14);
                 l_forearm_rot = Quat::from_rotation_x(-0.30);
                 r_forearm_rot = Quat::from_rotation_x(-0.30);
 
@@ -398,8 +398,8 @@ fn animate_biomechanics(
 
                 // Bras projetés vigoureusement vers le haut (-X)
                 let arm_angle = 0.45 * (1.0 - p) - 1.45 * p;
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.10);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.10);
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.15);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.15);
                 l_forearm_rot = Quat::from_rotation_x(-0.30 * (1.0 - p) - 0.25 * p);
                 r_forearm_rot = Quat::from_rotation_x(-0.30 * (1.0 - p) - 0.25 * p);
 
@@ -435,8 +435,8 @@ fn animate_biomechanics(
 
                 // Bras flottant au sommet puis redescendant doucement vers le bas
                 let arm_angle = -1.45 * (1.0 - tau) - 0.45 * tau;
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.10);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.10);
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.15);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.15);
                 l_forearm_rot = Quat::from_rotation_x(-0.25 * (1.0 - tau) - 0.35 * tau);
                 r_forearm_rot = Quat::from_rotation_x(-0.25 * (1.0 - tau) - 0.35 * tau);
 
@@ -470,8 +470,8 @@ fn animate_biomechanics(
 
                 // Bras fléchis en avant pour stabiliser le contrepoids
                 let arm_angle = -0.45 * (1.0 - tau) - 0.15 * tau;
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.08);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.08);
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.14);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.14);
                 l_forearm_rot = Quat::from_rotation_x(-0.35 * (1.0 - tau) - 0.20 * tau);
                 r_forearm_rot = Quat::from_rotation_x(-0.35 * (1.0 - tau) - 0.20 * tau);
 
@@ -496,8 +496,8 @@ fn animate_biomechanics(
                 r_calf_rot = Quat::from_rotation_x(0.15 * s);
 
                 let arm_angle = -0.15 * s;
-                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.06);
-                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.06);
+                l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, 0.12);
+                r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, arm_angle, 0.0, -0.12);
 
                 let elbow_angle = -0.20 * s - 0.10 * (1.0 - s);
                 l_forearm_rot = Quat::from_rotation_x(elbow_angle);
@@ -536,8 +536,8 @@ fn animate_biomechanics(
             r_clavicle_rot = Quat::from_euler(EulerRot::XYZ, -c * 0.15, 0.0, -0.04);
 
             // Bras levés droit devant à l'horizontale pour contrepoids parfait
-            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -c * 1.45, 0.0, 0.08);
-            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -c * 1.45, 0.0, -0.08);
+            l_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -c * 1.45, 0.0, 0.14);
+            r_upperarm_rot = Quat::from_euler(EulerRot::XYZ, -c * 1.45, 0.0, -0.14);
             l_forearm_rot = Quat::from_rotation_x(-0.25);
             r_forearm_rot = Quat::from_rotation_x(-0.25);
 

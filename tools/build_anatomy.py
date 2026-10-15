@@ -190,29 +190,113 @@ NEIGHBORS = {
     'RightToes': {'RightFoot', 'RightToes'},
 }
 
-def compute_weights_layer(pos: np.ndarray, layer: str):
-    """Calcule les 4 os d'influence et leurs poids de skinning avec partitionnement cinématique et anatomique strict."""
+ARM_KEYWORDS = [
+    'arm', 'forearm', 'hand', 'finger', 'thumb', 'index', 'humerus', 'radius', 'ulna', 
+    'carpal', 'metacarpal', 'phalanx of hand', 'palmar', 'deltoid', 'biceps brachii', 
+    'triceps brachii', 'brachialis', 'coracobrachialis', 'brachioradialis', 'pronator', 
+    'supinator', 'anconeus', 'thenar', 'hypothenar', 'scaphoideum', 'lunatum', 
+    'triquetrum', 'pisiforme', 'trapezium', 'trapezoideum', 'capitatum', 'hamatum',
+    'flexor digitorum superficialis', 'flexor digitorum profundus', 'flexor carpi',
+    'extensor digitorum', 'extensor carpi', 'abductor pollicis', 'extensor pollicis',
+    'flexor pollicis', 'adductor pollicis', 'opponens', 'lumbrical of hand', 
+    'interossei of hand', 'axillary', 'brachial', 'radial', 'ulnar', 'cephalic', 'basilic'
+]
+
+LEG_KEYWORDS = [
+    'thigh', 'femur', 'patella', 'tibia', 'fibula', 'calf', 'leg', 'foot', 'toe', 
+    'great toe', 'tarsal', 'metatarsal', 'phalanx of foot', 'plantar', 'calcaneus', 
+    'talus', 'navicular', 'cuneiform', 'cuboid', 'quadriceps', 'rectus femoris', 
+    'vastus', 'sartorius', 'gracilis', 'hamstring', 'biceps femoris', 'semitendinosus', 
+    'semimembranosus', 'gastrocnemius', 'soleus', 'plantaris', 'popliteus', 
+    'tibialis', 'peroneus', 'fibularis', 'extensor digitorum longus', 'flexor digitorum longus',
+    'extensor hallucis', 'flexor hallucis', 'lumbrical of foot', 'interossei of foot',
+    'femoral', 'popliteal', 'saphenous', 'sciatic', 'peroneal', 'tibial nerve'
+]
+
+def classify_part_zone(name: str, system: str) -> str:
+    n = name.lower()
+    if 'skin' in n and (system == 'integumentary' or 'integumentary' in system):
+        return 'SKIN'
+    if any(k in n for k in ARM_KEYWORDS):
+        if 'left' in n: return 'ARM_L'
+        if 'right' in n: return 'ARM_R'
+        return 'ARM_GENERIC'
+    if any(k in n for k in LEG_KEYWORDS):
+        if 'left' in n: return 'LEG_L'
+        if 'right' in n: return 'LEG_R'
+        return 'LEG_GENERIC'
+    return 'TRUNK'
+
+def compute_part_weights(pos: np.ndarray, name: str, system: str, layer: str):
+    """Calcule les 4 os d'influence et leurs poids LBS avec cloisonnement anatomique strict (Torse, Bras, Jambes)."""
     AP = pos[:, None, :] - bone_A[None, :, :]
     dot = np.sum(AP * bone_AB[None, :, :], axis=2)
     t = np.clip(dot / bone_len_sq[None, :], 0.0, 1.0)
     Q = bone_A[None, :, :] + t[:, :, None] * bone_AB[None, :, :]
     d_sq = np.sum((pos[:, None, :] - Q)**2, axis=2)
     
-    # 1. Les organes internes et vertèbres sont 100% rattachés au squelette axial (tronc)
-    if layer in ('Heart', 'Viscera', 'Vertebrae'):
-        d_sq[:, ~is_trunk] += 1e6
-        
-    # Masquage latéral strict : gauche vs droite (aucun membre gauche influencé par la droite, et réciproquement)
     is_left_pt = (pos[:, 0] >= 0)[:, None]
+    is_arm_r = np.array([b[0] in ARM_R_BONES for b in BONES])
+    is_leg_r = np.array([b[0] in LEG_R_BONES for b in BONES])
+    is_arm_l = np.array([b[0] in ARM_L_BONES for b in BONES])
+    is_leg_l = np.array([b[0] in LEG_L_BONES for b in BONES])
+    
+    # Masquage latéral strict
     d_sq[is_left_pt & (is_arm_r | is_leg_r)[None, :]] += 1e6
     d_sq[(~is_left_pt) & (is_arm_l | is_leg_l)[None, :]] += 1e6
     
-    # 2. Identification de l'os primaire le plus proche
+    # Organes, viscères et vertèbres toujours 100% sur le squelette axial (tronc)
+    if layer in ('Heart', 'Viscera', 'Vertebrae'):
+        is_trunk_b = np.array([b[0] in TRUNK_BONES for b in BONES])
+        d_sq[:, ~is_trunk_b] += 1e6
+        
+    zone = classify_part_zone(name, system)
+    if zone == 'TRUNK':
+        allowed = np.array([b[0] in (TRUNK_BONES | {'LeftClavicle', 'RightClavicle'}) for b in BONES])
+        d_sq[:, ~allowed] += 1e6
+    elif zone == 'ARM_L':
+        allowed = np.array([b[0] in ARM_L_BONES for b in BONES])
+        d_sq[:, ~allowed] += 1e6
+    elif zone == 'ARM_R':
+        allowed = np.array([b[0] in ARM_R_BONES for b in BONES])
+        d_sq[:, ~allowed] += 1e6
+    elif zone == 'LEG_L':
+        allowed = np.array([b[0] in (LEG_L_BONES | {'Hips'}) for b in BONES])
+        d_sq[:, ~allowed] += 1e6
+    elif zone == 'LEG_R':
+        allowed = np.array([b[0] in (LEG_R_BONES | {'Hips'}) for b in BONES])
+        d_sq[:, ~allowed] += 1e6
+    elif zone == 'ARM_GENERIC':
+        allowed_l = np.array([b[0] in ARM_L_BONES for b in BONES])
+        allowed_r = np.array([b[0] in ARM_R_BONES for b in BONES])
+        d_sq[is_left_pt & (~allowed_l)[None, :]] += 1e6
+        d_sq[(~is_left_pt) & (~allowed_r)[None, :]] += 1e6
+    elif zone == 'LEG_GENERIC':
+        allowed_l = np.array([b[0] in (LEG_L_BONES | {'Hips'}) for b in BONES])
+        allowed_r = np.array([b[0] in (LEG_R_BONES | {'Hips'}) for b in BONES])
+        d_sq[is_left_pt & (~allowed_l)[None, :]] += 1e6
+        d_sq[(~is_left_pt) & (~allowed_r)[None, :]] += 1e6
+    elif zone == 'SKIN':
+        x, y = pos[:, 0], pos[:, 1]
+        is_sk_arm_l = (x > 0) & (((y < 1.33) & (x > 0.165)) | ((y >= 1.33) & (y <= 1.55) & (x > 0.155)))
+        is_sk_arm_r = (x < 0) & (((y < 1.33) & (x < -0.165)) | ((y >= 1.33) & (y <= 1.55) & (x < -0.155)))
+        is_sk_leg_l = (x >= 0) & (y < 0.85) & (~is_sk_arm_l)
+        is_sk_leg_r = (x < 0) & (y < 0.85) & (~is_sk_arm_r)
+        is_sk_torso = (~is_sk_arm_l) & (~is_sk_arm_r) & (~is_sk_leg_l) & (~is_sk_leg_r)
+        
+        m_al = np.array([b[0] in ARM_L_BONES for b in BONES])
+        m_ar = np.array([b[0] in ARM_R_BONES for b in BONES])
+        m_ll = np.array([b[0] in (LEG_L_BONES | {'Hips'}) for b in BONES])
+        m_lr = np.array([b[0] in (LEG_R_BONES | {'Hips'}) for b in BONES])
+        m_to = np.array([b[0] in (TRUNK_BONES | {'LeftClavicle', 'RightClavicle'}) for b in BONES])
+        
+        d_sq[is_sk_arm_l[:, None] & (~m_al[None, :])] += 1e6
+        d_sq[is_sk_arm_r[:, None] & (~m_ar[None, :])] += 1e6
+        d_sq[is_sk_leg_l[:, None] & (~m_ll[None, :])] += 1e6
+        d_sq[is_sk_leg_r[:, None] & (~m_lr[None, :])] += 1e6
+        d_sq[is_sk_torso[:, None] & (~m_to[None, :])] += 1e6
+        
     primary_bone_idx = np.argmin(d_sq, axis=1)
-    
-    # 3. Masquage cinématique strict : seuls l'os primaire et ses voisins directs
-    # dans la chaîne squelettique (parent/enfants) sont autorisés à influencer le vertex.
-    # Ceci élimine radicalement tout artefact d'étirement (ex: avant-bras attaché aux hanches).
     mask = np.zeros_like(d_sq, dtype=bool)
     for b_idx, (bname, _, _, _) in enumerate(BONES):
         allowed_names = NEIGHBORS[bname]
@@ -222,7 +306,6 @@ def compute_weights_layer(pos: np.ndarray, layer: str):
             mask[v_in_b, ai] = True
             
     d_sq[~mask] += 1e6
-    
     raw_weights = 1.0 / (d_sq + 0.0025)**2
     top4_idx = np.argsort(-raw_weights, axis=1)[:, :4]
     top4_weights = np.take_along_axis(raw_weights, top4_idx, axis=1)
@@ -245,8 +328,9 @@ def build_skinned_glb(atlas_file: Path, bin_prefix: str, classify_layer_fn, outp
             chunk_buffers.append(f.read())
             
     # Regroupement des géométries complètes et intactes par calque (aucun découpage)
-    layer_geom = {l: {"pos": [], "norm": [], "idx": [], "v_offset": 0} for l in GROUP_ORDER}
+    layer_geom = {l: {"pos": [], "norm": [], "idx": [], "joints": [], "weights": [], "v_offset": 0} for l in GROUP_ORDER}
     
+    print("Calcul du skinning LBS anatomique par structure (cloisonnement torse/bras/jambes)...")
     for p in parts:
         layer = classify_layer_fn(p)
         buf = chunk_buffers[p["chunk"]]
@@ -256,10 +340,14 @@ def build_skinned_glb(atlas_file: Path, bin_prefix: str, classify_layer_fn, outp
         norm = (np.frombuffer(buf, dtype=np.int16, count=vc*3, offset=p["normals"]).astype(np.float32) / 32767.0).reshape(-1, 3)
         idx = np.frombuffer(buf, dtype=np.uint32, count=ic, offset=p["indices"])
         
+        part_j, part_w = compute_part_weights(pos, p["name"], p.get("system", ""), layer)
+        
         target = layer_geom[layer]
         target["idx"].append(idx + target["v_offset"])
         target["pos"].append(pos)
         target["norm"].append(norm)
+        target["joints"].append(part_j)
+        target["weights"].append(part_w)
         target["v_offset"] += vc
         
     print("Géométries regroupées intactes. Calcul du skinning LBS anatomique (17 articulations)...")
@@ -319,7 +407,8 @@ def build_skinned_glb(atlas_file: Path, bin_prefix: str, classify_layer_fn, outp
         norm_all = np.vstack(gdata["norm"]).astype(np.float32)
         idx_all = np.concatenate(gdata["idx"]).astype(np.uint32)
         
-        joints_all, weights_all = compute_weights_layer(pos_all, l)
+        joints_all = np.vstack(gdata["joints"]).astype(np.uint16)
+        weights_all = np.vstack(gdata["weights"]).astype(np.float32)
         
         # Positions
         pos_offset = len(bin_bytes)
