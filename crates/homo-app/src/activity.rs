@@ -1,10 +1,11 @@
-//! Moteur biomécanique et cinématique des activités humaines (marche, course, sprint, saut, squat).
-//! Anime simultanément le squelette, les vertèbres, les muscles, les viscères, la peau et le système vasculaire,
-//! tout en pilotant l'effort métabolique et le tableau de bord physiologique.
+//! Moteur biomécanique et cinématique réelle des articulations humaines (marche, course, sprint, saut, squat).
+//! Anime les 15 articulations squelettiques (hanches, genoux, chevilles, épaules, coudes, colonne, cou)
+//! tout en coordonnant les 9 calques anatomiques (os, muscles, vaisseaux, viscères, peau) et le métabolisme.
 
+use core::f32::consts::{FRAC_PI_2, PI, TAU};
 use bevy::prelude::*;
 
-use crate::anatomy::{BaseScale, MusclesMarker, VertebraeMarker, VisceraMarker};
+use crate::anatomy::{BaseJointTransform, BaseScale, BodyJoint, MusclesMarker, VertebraeMarker, VisceraMarker};
 use crate::layers::{FemaleModel, Gender, MaleModel};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -34,8 +35,8 @@ impl ActivityType {
             ActivityType::Walk => "🚶 Marche (5 km/h)",
             ActivityType::Run => "🏃 Course (12 km/h)",
             ActivityType::Sprint => "⚡ Sprint (24 km/h)",
-            ActivityType::Jump => "🦘 Saut Vertical",
-            ActivityType::Squat => "🏋 Squat (Flexions)",
+            ActivityType::Jump => "🦘 Saut Vertical (CMJ)",
+            ActivityType::Squat => "🏋 Squat (Flexions 90°)",
         }
     }
 
@@ -53,15 +54,16 @@ impl ActivityType {
     pub fn description(self) -> &'static str {
         match self {
             ActivityType::Idle => "Postural au repos, ventilation basale eupnéique.",
-            ActivityType::Walk => "Locomotion active, cadence 112 pas/min, résonance hémodynamique.",
-            ActivityType::Run => "Foulée aérobie soutenue, impact 2,2 G, pompe veino-musculaire accrue.",
-            ActivityType::Sprint => "Effort anaérobie maximal, recrutement complet des unités motrices.",
-            ActivityType::Jump => "Impulsion explosive, phase aérienne balistique et amorti rachidien.",
-            ActivityType::Squat => "Contrainte lombaire L4-L5 quadruplée, charge isométrique quadriceps.",
+            ActivityType::Walk => "Locomotion active, cadence 112 pas/min, balancement pendulaire.",
+            ActivityType::Run => "Foulée aérobie soutenue (165 pas/min), flexion genou 85°, pompe musculaire.",
+            ActivityType::Sprint => "Sprint maximal (220 pas/min), triple extension explosive, flexion genou 115°.",
+            ActivityType::Jump => "Saut CMJ 5 phases : flexion, triple extension 2,85 G, vol libre, amorti 2,75 G.",
+            ActivityType::Squat => "Flexion bilatérale 90°, cuisses horizontales, charge quadriceps 480 W.",
         }
     }
 }
 
+/// État cinématique, dynamique et métabolique de l'activité en cours.
 #[derive(Resource)]
 pub struct ActivityState {
     pub current: ActivityType,
@@ -74,10 +76,10 @@ pub struct ActivityState {
     pub calories_kcal_h: f32,
     pub breath_rate_rpm: f32,
     pub minute_ventilation_l_min: f32,
-    // Timers pour les cycles cinématiques continus
+
     pub cycle_time: f32,
     pub jump_timer: f32,
-    // Effort cible et lissé envoyé au modèle cardiovasculaire
+
     pub current_effort: f64,
     pub target_effort: f64,
 }
@@ -130,11 +132,9 @@ fn update_activity_physics(
     act.cycle_time += dt;
     act.jump_timer += dt;
 
-    // Lissage exponentiel de l'effort physiologique (adaptation cardiovasculaire réaliste en 1,5 s)
     let k = 1.0 - (-2.2 * dt as f64).exp();
     act.current_effort += (act.target_effort - act.current_effort) * k;
 
-    // Calcul des cibles d'après l'activité courante
     let (tgt_spd, tgt_cad, tgt_vo2, tgt_mets, tgt_w, tgt_kcal, tgt_rpm, tgt_vent) = match act.current {
         ActivityType::Idle => (0.0, 0.0, 3.5, 1.0, 75.0, 70.0, 14.0, 7.0),
         ActivityType::Walk => (5.0, 112.0, 14.5, 4.1, 260.0, 275.0, 22.0, 24.0),
@@ -155,16 +155,15 @@ fn update_activity_physics(
     act.minute_ventilation_l_min += (tgt_vent - act.minute_ventilation_l_min) * blend;
 }
 
-/// Anime la cinématique globale du corps humain (translation, rebonds, oscillations, inclinaisons)
-/// pour que les 9 calques anatomiques (os, vertèbres, muscles, vaisseaux, organes, nerfs, peau)
-/// bougent en parfaite cohérence.
+/// Anime la cinématique réelle des 15 articulations (Hanches, Genoux, Chevilles, Épaules, Coudes, Colonne).
 #[allow(clippy::type_complexity)]
 fn animate_biomechanics(
     _time: Res<Time>,
     gender: Res<Gender>,
     mut act: ResMut<ActivityState>,
-    mut transforms: ParamSet<(
+    mut set: ParamSet<(
         Query<(&mut Transform, Option<&MaleModel>, Option<&FemaleModel>)>,
+        Query<(&BodyJoint, &BaseJointTransform, &mut Transform)>,
         Query<(&BaseScale, &mut Transform), With<VertebraeMarker>>,
         Query<(&BaseScale, &mut Transform), With<VisceraMarker>>,
         Query<(&BaseScale, &mut Transform), With<MusclesMarker>>,
@@ -173,127 +172,349 @@ fn animate_biomechanics(
     let t = act.cycle_time;
     let jt = act.jump_timer;
 
-    let mut trans = Vec3::ZERO;
-    let mut pitch = 0.0_f32;
-    let mut roll = 0.0_f32;
-    let mut yaw = 0.0_f32;
     let mut current_g = 1.0_f32;
     let mut vert_compression = 0.0_f32;
 
+    let mut hips_offset = Vec3::ZERO;
+    let mut hips_rot = Quat::IDENTITY;
+    let mut spine_rot = Quat::IDENTITY;
+    let mut thorax_rot = Quat::IDENTITY;
+    let mut neck_rot = Quat::IDENTITY;
+    let mut head_rot = Quat::IDENTITY;
+
+    let mut l_thigh_rot = Quat::IDENTITY;
+    let mut l_calf_rot = Quat::IDENTITY;
+    let mut l_foot_rot = Quat::IDENTITY;
+
+    let mut r_thigh_rot = Quat::IDENTITY;
+    let mut r_calf_rot = Quat::IDENTITY;
+    let mut r_foot_rot = Quat::IDENTITY;
+
+    let mut l_upperarm_rot = Quat::IDENTITY;
+    let mut l_forearm_rot = Quat::IDENTITY;
+    let mut l_hand_rot = Quat::IDENTITY;
+
+    let mut r_upperarm_rot = Quat::IDENTITY;
+    let mut r_forearm_rot = Quat::IDENTITY;
+    let mut r_hand_rot = Quat::IDENTITY;
+
     match act.current {
         ActivityType::Idle => {
-            // Respiration lente au repos (cycle de ~4.3 s) et micro-balancement postural
-            let resp = (t * 0.233 * core::f32::consts::TAU).sin();
-            trans.y = resp * 0.004;
-            pitch = resp * 0.008;
-            roll = (t * 0.35).sin() * 0.003;
+            let resp = (t * 0.233 * TAU).sin();
+            hips_offset.y = resp * 0.003;
+            thorax_rot = Quat::from_rotation_x(resp * 0.012);
+            hips_rot = Quat::from_euler(EulerRot::YXZ, (t * 0.35).sin() * 0.005, resp * 0.004, (t * 0.25).cos() * 0.003);
             current_g = 1.0;
             vert_compression = 0.0;
         }
         ActivityType::Walk => {
             let cad_hz = 112.0 / 60.0;
-            let omega = cad_hz * core::f32::consts::TAU;
-            // 2 pas par cycle : oscillation verticale
+            let omega = cad_hz * TAU;
+            let phi_l = omega * t;
+            let phi_r = phi_l + PI;
+
             let bounce = (omega * 2.0 * t).sin();
-            trans.y = bounce * 0.032;
-            // Balancement latéral vers le pied d'appui
-            trans.x = (omega * t).sin() * 0.022;
-            roll = -(omega * t).sin() * 0.035;
-            yaw = (omega * t).cos() * 0.045;
-            pitch = 0.035; // légère inclinaison avant
+            let sway = (omega * t).sin();
+
+            hips_offset.y = bounce * 0.032;
+            hips_offset.x = sway * 0.022;
+
+            hips_rot = Quat::from_euler(EulerRot::YXZ, -sway * 0.045, 0.035, -sway * 0.035);
+            thorax_rot = Quat::from_euler(EulerRot::YXZ, sway * 0.040, 0.020, 0.0);
+
+            // Flexion / extension hanches
+            l_thigh_rot = Quat::from_rotation_x(phi_l.sin() * 0.38);
+            r_thigh_rot = Quat::from_rotation_x(phi_r.sin() * 0.38);
+
+            // Flexion genoux
+            let l_knee = (phi_l - 0.3).cos().max(0.0) * 0.85;
+            let r_knee = (phi_r - 0.3).cos().max(0.0) * 0.85;
+            l_calf_rot = Quat::from_rotation_x(l_knee);
+            r_calf_rot = Quat::from_rotation_x(r_knee);
+
+            // Chevilles
+            l_foot_rot = Quat::from_rotation_x(phi_l.sin() * 0.20);
+            r_foot_rot = Quat::from_rotation_x(phi_r.sin() * 0.20);
+
+            // Balancement des bras en opposition croisée
+            l_upperarm_rot = Quat::from_rotation_x(-phi_l.sin() * 0.35);
+            r_upperarm_rot = Quat::from_rotation_x(-phi_r.sin() * 0.35);
+            l_forearm_rot = Quat::from_rotation_x(0.35);
+            r_forearm_rot = Quat::from_rotation_x(0.35);
+
             current_g = 1.0 + bounce.max(0.0) * 0.35;
             vert_compression = bounce.max(0.0) * 0.025;
         }
-        ActivityType::Run => {
-            let cad_hz = 165.0 / 60.0;
-            let omega = cad_hz * core::f32::consts::TAU;
+        ActivityType::Run | ActivityType::Sprint => {
+            let is_sprint = act.current == ActivityType::Sprint;
+            let cad_hz = if is_sprint { 220.0 / 60.0 } else { 165.0 / 60.0 };
+            let omega = cad_hz * TAU;
+            let phi_l = omega * t;
+            let phi_r = phi_l + PI;
+
             let bounce = (omega * 2.0 * t).sin();
-            trans.y = bounce * 0.068;
-            trans.x = (omega * t).sin() * 0.028;
-            roll = -(omega * t).sin() * 0.055;
-            yaw = (omega * t).cos() * 0.075;
-            pitch = 0.125 + bounce * 0.025; // inclinaison de course ~7.5°
-            current_g = 1.0 + bounce.max(0.0) * 1.25;
-            vert_compression = bounce.max(0.0) * 0.055;
-        }
-        ActivityType::Sprint => {
-            let cad_hz = 220.0 / 60.0;
-            let omega = cad_hz * core::f32::consts::TAU;
-            let bounce = (omega * 2.0 * t).sin();
-            trans.y = bounce * 0.092;
-            trans.x = (omega * t).sin() * 0.035;
-            roll = -(omega * t).sin() * 0.070;
-            yaw = (omega * t).cos() * 0.095;
-            pitch = 0.22 + bounce * 0.035; // attaque agressive ~13°
-            current_g = 1.0 + bounce.max(0.0) * 2.2;
-            vert_compression = bounce.max(0.0) * 0.085;
+            let sway = (omega * t).sin();
+
+            let a_thigh = if is_sprint { 0.95 } else { 0.65 };
+            let a_knee = if is_sprint { 1.95 } else { 1.45 };
+            let a_arm = if is_sprint { 1.15 } else { 0.75 };
+            let pitch = if is_sprint { 0.22 } else { 0.14 };
+
+            hips_offset.y = bounce * if is_sprint { 0.088 } else { 0.062 };
+            hips_offset.x = sway * 0.028;
+
+            hips_rot = Quat::from_euler(EulerRot::YXZ, -sway * 0.075, pitch, -sway * 0.055);
+            thorax_rot = Quat::from_euler(EulerRot::YXZ, sway * 0.085, 0.040, 0.0);
+
+            // Hanches : foulée puissante alternée
+            l_thigh_rot = Quat::from_rotation_x(phi_l.sin() * a_thigh);
+            r_thigh_rot = Quat::from_rotation_x(phi_r.sin() * a_thigh);
+
+            // Genoux : forte flexion au retour de jambe (talon sous fessier)
+            let l_knee = (phi_l - 0.4).cos().max(0.0) * a_knee;
+            let r_knee = (phi_r - 0.4).cos().max(0.0) * a_knee;
+            l_calf_rot = Quat::from_rotation_x(l_knee);
+            r_calf_rot = Quat::from_rotation_x(r_knee);
+
+            // Chevilles : impulsion plantaire
+            l_foot_rot = Quat::from_rotation_x(phi_l.sin() * 0.35);
+            r_foot_rot = Quat::from_rotation_x(phi_r.sin() * 0.35);
+
+            // Bras : pompage athlétique à 90° opposé aux jambes
+            l_upperarm_rot = Quat::from_rotation_x(-phi_l.sin() * a_arm);
+            r_upperarm_rot = Quat::from_rotation_x(-phi_r.sin() * a_arm);
+            l_forearm_rot = Quat::from_rotation_x(1.45 + phi_l.sin() * 0.30);
+            r_forearm_rot = Quat::from_rotation_x(1.45 + phi_r.sin() * 0.30);
+
+            current_g = 1.0 + bounce.max(0.0) * if is_sprint { 2.2 } else { 1.25 };
+            vert_compression = bounce.max(0.0) * if is_sprint { 0.085 } else { 0.055 };
         }
         ActivityType::Jump => {
-            // Cycle de saut périodique complet (durée 2.0 s)
+            // Cycle de saut complet CMJ (durée 2.0 s)
             let cycle = 2.0_f32;
             let phase_t = jt % cycle;
 
             if phase_t < 0.45 {
-                // Phase 1 : Flexion / Armement
+                // Phase 1 : Armement / Flexion préliminaire (knees bend, hips sink, arms back)
                 let p = phase_t / 0.45;
-                let s = (p * core::f32::consts::FRAC_PI_2).sin();
-                trans.y = -s * 0.26;
-                pitch = s * 0.16;
+                let s = (p * FRAC_PI_2).sin();
+
+                hips_offset.y = -s * 0.28;
+                hips_rot = Quat::from_rotation_x(s * 0.22);
+                thorax_rot = Quat::from_rotation_x(s * 0.16);
+
+                l_thigh_rot = Quat::from_rotation_x(-s * 0.70); // hanches fléchies -40°
+                r_thigh_rot = Quat::from_rotation_x(-s * 0.70);
+
+                l_calf_rot = Quat::from_rotation_x(s * 1.40);   // genoux fléchis +80°
+                r_calf_rot = Quat::from_rotation_x(s * 1.40);
+
+                l_foot_rot = Quat::from_rotation_x(-s * 0.35);  // dorsiflexion
+                r_foot_rot = Quat::from_rotation_x(-s * 0.35);
+
+                l_upperarm_rot = Quat::from_rotation_x(-s * 0.75); // bras en arrière
+                r_upperarm_rot = Quat::from_rotation_x(-s * 0.75);
+                l_forearm_rot = Quat::from_rotation_x(s * 0.45);
+                r_forearm_rot = Quat::from_rotation_x(s * 0.45);
+
                 current_g = 1.0 - s * 0.4;
                 vert_compression = 0.01;
             } else if phase_t < 0.70 {
-                // Phase 2 : Impulsion explosive
+                // Phase 2 : Impulsion explosive / Triple Extension (snap knees, push toes, arms overhead)
                 let p = (phase_t - 0.45) / 0.25;
-                trans.y = -0.26 + p * 0.26;
-                pitch = 0.16 * (1.0 - p);
-                let impulse = (p * core::f32::consts::PI).sin();
-                current_g = 1.0 + impulse * 1.85; // pic à 2.85 G
+                let s = 1.0 - p;
+
+                hips_offset.y = -s * 0.28 + p * 0.12;
+                hips_rot = Quat::from_rotation_x(s * 0.22 - p * 0.08);
+                thorax_rot = Quat::from_rotation_x(-p * 0.10);
+
+                l_thigh_rot = Quat::from_rotation_x(-s * 0.70); // extension complète
+                r_thigh_rot = Quat::from_rotation_x(-s * 0.70);
+
+                l_calf_rot = Quat::from_rotation_x(s * 1.40);   // genoux tendus à 0°
+                r_calf_rot = Quat::from_rotation_x(s * 1.40);
+
+                l_foot_rot = Quat::from_rotation_x(p * 0.65);   // poussée sur la pointe +37°
+                r_foot_rot = Quat::from_rotation_x(p * 0.65);
+
+                l_upperarm_rot = Quat::from_rotation_x(p * 1.45); // bras propulsés vers le haut +83°
+                r_upperarm_rot = Quat::from_rotation_x(p * 1.45);
+                l_forearm_rot = Quat::from_rotation_x(0.30);
+                r_forearm_rot = Quat::from_rotation_x(0.30);
+
+                let impulse = (p * PI).sin();
+                current_g = 1.0 + impulse * 1.85; // pic de décollage à 2,85 G
                 vert_compression = 0.04 * impulse;
             } else if phase_t < 1.35 {
-                // Phase 3 : Vol balistique libre (suspension dans les airs)
+                // Phase 3 : Vol balistique libre / Apex en apesanteur (+45 cm)
                 let p = (phase_t - 0.70) / 0.65;
-                let arc = (p * core::f32::consts::PI).sin();
-                trans.y = arc * 0.45; // élévation de 45 cm au-dessus du sol
-                pitch = -0.06 * arc;
-                current_g = 0.05; // quasi-apesanteur en chute libre
+                let arc = (p * PI).sin();
+
+                hips_offset.y = 0.12 + arc * 0.45; // corps suspendu en l'air à +57 cm
+                hips_rot = Quat::from_rotation_x(-arc * 0.08);
+                thorax_rot = Quat::IDENTITY;
+
+                l_thigh_rot = Quat::from_rotation_x(-arc * 0.35); // jambes légèrement repliées
+                r_thigh_rot = Quat::from_rotation_x(-arc * 0.35);
+
+                l_calf_rot = Quat::from_rotation_x(arc * 0.55);   // genoux fléchis 31°
+                r_calf_rot = Quat::from_rotation_x(arc * 0.55);
+
+                l_foot_rot = Quat::from_rotation_x(0.15);
+                r_foot_rot = Quat::from_rotation_x(0.15);
+
+                let arm_float = 1.45 * (1.0 - p) + 0.30 * p;
+                l_upperarm_rot = Quat::from_rotation_x(arm_float);
+                r_upperarm_rot = Quat::from_rotation_x(arm_float);
+                l_forearm_rot = Quat::from_rotation_x(0.40);
+                r_forearm_rot = Quat::from_rotation_x(0.40);
+
+                current_g = 0.05; // apesanteur en vol libre
                 vert_compression = 0.0;
+            } else if phase_t < 1.70 {
+                // Phase 4 : Réception & Amorti d'impact (knees bend to 72° to absorb shock)
+                let p = (phase_t - 1.35) / 0.35;
+                let decel = (p * PI).sin() * (1.0 - 0.25 * p);
+
+                hips_offset.y = -decel * 0.22;
+                hips_rot = Quat::from_rotation_x(decel * 0.18);
+                thorax_rot = Quat::from_rotation_x(decel * 0.25);
+
+                l_thigh_rot = Quat::from_rotation_x(-decel * 0.60); // flexion hanches
+                r_thigh_rot = Quat::from_rotation_x(-decel * 0.60);
+
+                l_calf_rot = Quat::from_rotation_x(decel * 1.25);   // flexion amortissante genoux +72°
+                r_calf_rot = Quat::from_rotation_x(decel * 1.25);
+
+                l_foot_rot = Quat::from_rotation_x(-decel * 0.25);
+                r_foot_rot = Quat::from_rotation_x(-decel * 0.25);
+
+                l_upperarm_rot = Quat::from_rotation_x(-decel * 0.35);
+                r_upperarm_rot = Quat::from_rotation_x(-decel * 0.35);
+                l_forearm_rot = Quat::from_rotation_x(0.50);
+                r_forearm_rot = Quat::from_rotation_x(0.50);
+
+                let impact_pulse = (p * FRAC_PI_2).sin() * (1.0 - p);
+                current_g = 1.0 + impact_pulse * 1.75; // pic d'impact 2,75 G
+                vert_compression = impact_pulse * 0.065;
             } else {
-                // Phase 4 : Réception & Amorti au sol
-                let p = (phase_t - 1.35) / 0.65;
-                let decel = (p * core::f32::consts::PI).sin() * (1.0 - 0.4 * p);
-                trans.y = -decel * 0.16;
-                pitch = decel * 0.12;
-                let impact_pulse = (p * core::f32::consts::FRAC_PI_2).sin() * (1.0 - p);
-                current_g = 1.0 + impact_pulse * 1.75; // pic de contact 2.75 G
-                vert_compression = impact_pulse * 0.065; // forte compression des disques
+                // Phase 5 : Rétablissement postural élastique
+                let p = (phase_t - 1.70) / 0.30;
+                let s = 1.0 - p;
+
+                hips_offset.y = -s * 0.06;
+                l_calf_rot = Quat::from_rotation_x(s * 0.20);
+                r_calf_rot = Quat::from_rotation_x(s * 0.20);
+                current_g = 1.0;
+                vert_compression = 0.0;
             }
         }
         ActivityType::Squat => {
-            // Flexion profonde contrôlée (cycle de 2.4 s)
+            // Flexion profonde contrôlée 90° (cycle 2,4 s)
             let cycle = 2.4_f32;
-            let theta = (jt % cycle) / cycle * core::f32::consts::TAU;
-            let c = (1.0 - theta.cos()) * 0.5; // 0 (haut) -> 1 (bas) -> 0
-            trans.y = -c * 0.38; // descente profonde de 38 cm
-            pitch = c * 0.24;   // inclinaison lombaire pour équilibre
-            current_g = 1.0 + c * 2.5; // charge lombaire quadruplée en position basse
+            let theta = (jt % cycle) / cycle * TAU;
+            let c = (1.0 - theta.cos()) * 0.5; // 0 -> 1 -> 0
+
+            hips_offset.y = -c * 0.38;
+            hips_offset.z = -c * 0.12; // fessiers repoussés en arrière
+
+            hips_rot = Quat::from_rotation_x(c * 0.20);
+            thorax_rot = Quat::from_rotation_x(c * 0.25); // tronc droit incliné pour équilibre
+
+            // Cuisses horizontales à 90°
+            l_thigh_rot = Quat::from_rotation_x(-c * 1.35);
+            r_thigh_rot = Quat::from_rotation_x(-c * 1.35);
+
+            // Genoux fléchis à angle droit
+            l_calf_rot = Quat::from_rotation_x(c * 1.55);
+            r_calf_rot = Quat::from_rotation_x(c * 1.55);
+
+            l_foot_rot = Quat::from_rotation_x(-c * 0.35);
+            r_foot_rot = Quat::from_rotation_x(-c * 0.35);
+
+            // Bras levés à l'horizontale pour contrepoids
+            l_upperarm_rot = Quat::from_rotation_x(c * 1.40);
+            r_upperarm_rot = Quat::from_rotation_x(c * 1.40);
+            l_forearm_rot = Quat::from_rotation_x(0.20);
+            r_forearm_rot = Quat::from_rotation_x(0.20);
+
+            current_g = 1.0 + c * 2.5; // charge lombaire quadruplée en bas
             vert_compression = c * 0.045;
         }
     }
 
     act.impact_g = current_g;
 
-    // 1. Application aux modèles racines (Homme / Femme) : tous les 9 calques bougent ensemble !
-    for (mut tf, male, female) in &mut transforms.p0() {
+    // 1. Modèle racine (Homme / Femme) : translation globale
+    for (mut tf, male, female) in &mut set.p0() {
         let is_active = (*gender == Gender::Male && male.is_some())
             || (*gender == Gender::Female && female.is_some());
         if is_active {
-            tf.translation = trans;
-            tf.rotation = Quat::from_euler(EulerRot::YXZ, yaw, -pitch, roll);
+            // Translation globale
+            tf.translation = Vec3::new(hips_offset.x, 0.0, hips_offset.z);
         }
     }
 
-    // 2. Colonne vertébrale (Vertebrae) : micro-compression élastique à chaque impact
-    for (base, mut tf) in &mut transforms.p1() {
+    // 2. Application aux 15 articulations biomécaniques réelles
+    for (joint, base_tf, mut tf) in &mut set.p1() {
+        match joint {
+            BodyJoint::Hips => {
+                tf.translation = base_tf.0.translation + Vec3::new(0.0, hips_offset.y, 0.0);
+                tf.rotation = base_tf.0.rotation * hips_rot;
+            }
+            BodyJoint::Spine => {
+                tf.rotation = base_tf.0.rotation * spine_rot;
+            }
+            BodyJoint::Thorax => {
+                tf.rotation = base_tf.0.rotation * thorax_rot;
+            }
+            BodyJoint::Neck => {
+                tf.rotation = base_tf.0.rotation * neck_rot;
+            }
+            BodyJoint::Head => {
+                tf.rotation = base_tf.0.rotation * head_rot;
+            }
+            BodyJoint::LeftThigh => {
+                tf.rotation = base_tf.0.rotation * l_thigh_rot;
+            }
+            BodyJoint::LeftCalf => {
+                tf.rotation = base_tf.0.rotation * l_calf_rot;
+            }
+            BodyJoint::LeftFoot => {
+                tf.rotation = base_tf.0.rotation * l_foot_rot;
+            }
+            BodyJoint::RightThigh => {
+                tf.rotation = base_tf.0.rotation * r_thigh_rot;
+            }
+            BodyJoint::RightCalf => {
+                tf.rotation = base_tf.0.rotation * r_calf_rot;
+            }
+            BodyJoint::RightFoot => {
+                tf.rotation = base_tf.0.rotation * r_foot_rot;
+            }
+            BodyJoint::LeftUpperArm => {
+                tf.rotation = base_tf.0.rotation * l_upperarm_rot;
+            }
+            BodyJoint::LeftForearm => {
+                tf.rotation = base_tf.0.rotation * l_forearm_rot;
+            }
+            BodyJoint::LeftHand => {
+                tf.rotation = base_tf.0.rotation * l_hand_rot;
+            }
+            BodyJoint::RightUpperArm => {
+                tf.rotation = base_tf.0.rotation * r_upperarm_rot;
+            }
+            BodyJoint::RightForearm => {
+                tf.rotation = base_tf.0.rotation * r_forearm_rot;
+            }
+            BodyJoint::RightHand => {
+                tf.rotation = base_tf.0.rotation * r_hand_rot;
+            }
+        }
+    }
+
+    // 3. Colonne vertébrale (Vertebrae) : micro-compression élastique d'impact
+    for (base, mut tf) in &mut set.p2() {
         let comp = vert_compression.clamp(0.0, 0.12);
         tf.scale = Vec3::new(
             base.0.x * (1.0 + comp * 0.35),
@@ -302,12 +523,12 @@ fn animate_biomechanics(
         );
     }
 
-    // 3. Poumons & Viscères (Viscera) : ventilation pulmonaire en direct (rythme d'effort)
+    // 4. Poumons & Viscères (Viscera) : ventilation pulmonaire en direct (rythme d'effort)
     let resp_hz = act.breath_rate_rpm / 60.0;
-    let breath_wave = (t * resp_hz * core::f32::consts::TAU).sin();
+    let breath_wave = (t * resp_hz * TAU).sin();
     let effort_factor = 1.0 + act.current_effort as f32 * 0.8;
     let breath_expand = breath_wave * 0.045 * effort_factor;
-    for (base, mut tf) in &mut transforms.p2() {
+    for (base, mut tf) in &mut set.p3() {
         tf.scale = Vec3::new(
             base.0.x * (1.0 + breath_expand * 0.8),
             base.0.y * (1.0 + breath_expand * 0.4),
@@ -315,9 +536,9 @@ fn animate_biomechanics(
         );
     }
 
-    // 4. Muscles : contraction et tonus musculaire d'effort
+    // 5. Muscles : contraction et tonus musculaire d'effort
     let muscle_pump = 1.0 + (act.current_effort as f32) * 0.05;
-    for (base, mut tf) in &mut transforms.p3() {
+    for (base, mut tf) in &mut set.p4() {
         tf.scale = Vec3::new(
             base.0.x * muscle_pump,
             base.0.y,

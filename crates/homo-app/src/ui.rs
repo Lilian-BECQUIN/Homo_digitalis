@@ -336,6 +336,9 @@ fn hud(
         });
     });
 
+    // Synchronisation automatique de l'effort physiologique avec l'activité sélectionnée
+    s.inputs.effort = activity.current_effort;
+
     // Envoi des entrées uniquement si elles ont changé.
     if s.inputs != s.last_sent {
         handle.send(Command::SetInputs(s.inputs));
