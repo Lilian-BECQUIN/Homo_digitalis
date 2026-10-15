@@ -19,6 +19,10 @@ fn main() {
             primary_window: Some(Window {
                 title: "Homo Digitalis — simulateur physiologique (éducatif)".into(),
                 resolution: (1600., 900.).into(),
+                #[cfg(target_arch = "wasm32")]
+                fit_canvas_to_parent: true,
+                #[cfg(target_arch = "wasm32")]
+                canvas: Some("#bevy_canvas".into()),
                 ..default()
             }),
             ..default()

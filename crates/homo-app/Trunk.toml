@@ -1,0 +1,7 @@
+[build]
+target = "index.html"
+public_url = "./"
+release = true
+
+[clean]
+cargo = false

@@ -16,14 +16,26 @@ biomécanique, métabolisme/PBPK, thermorégulation) avec visualisation 3D inter
   hémorragie, altitude/SpO₂, anaphylaxie, viscosité, adrénaline, snapshots/rewind, oscilloscopes.
 - ⏳ Phases 3 à 5 : voir `docs/ARCHITECTURE.md`.
 
-## Prérequis
+## Lancement rapide sans configuration (WebAssembly)
+Si votre système Windows bloque l'exécution des exécutables `.exe` non signés (Smart App Control / WDAC), utilisez la version WebAssembly dans votre navigateur (Chrome, Edge) :
+
+1. Allez sur les **Actions GitHub** de votre dépôt : <https://github.com/Lilian-BECQUIN/Homo_digitalis/actions>
+2. Ouvrez le workflow **Build Web (WASM)** et téléchargez l'artefact **`homo-digitalis-web`** en bas de la page.
+3. Décompressez le fichier `.zip` dans un dossier.
+4. Lancez simplement dans PowerShell ou cmd :
+   ```bash
+   python serve_web.py
+   ```
+   Votre navigateur s'ouvre automatiquement sur `http://localhost:8000` avec l'application 3D interactive et le solveur temps réel !
+
+## Prérequis pour le développement natif
 1. Installer Rust (≥ 1.82) : <https://rustup.rs>
 2. Windows : *Build Tools for Visual Studio* (charge de travail C++). Linux : `libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev`.
 
-## Commandes
+## Commandes (Développement natif)
 ```bash
 cargo test -p sim-core                 # solveur, modèle cardiovasculaire, garde-fous (sans GPU)
-cargo run -p homo-app                  # application (1re compilation de Bevy : plusieurs minutes)
+cargo run -p homo-app                  # application desktop (1re compilation de Bevy : plusieurs minutes)
 cargo run -p homo-app --release
 ```
 
